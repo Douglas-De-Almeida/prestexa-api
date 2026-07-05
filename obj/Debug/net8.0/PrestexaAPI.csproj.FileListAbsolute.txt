@@ -1,0 +1,310 @@
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/appsettings.Development.json
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/appsettings.json
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/PrestexaAPI
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/PrestexaAPI.deps.json
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/PrestexaAPI.runtimeconfig.json
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/PrestexaAPI.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/PrestexaAPI.pdb
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Azure.Core.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Azure.Extensions.AspNetCore.Configuration.Secrets.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Azure.Identity.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Azure.Security.KeyVault.Secrets.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/BCrypt-Net-Next.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Humanizer.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/itext.barcodes.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/itext.bouncy-castle-connector.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/itext.forms.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/itext.io.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/itext.kernel.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/itext.layout.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/itext.pdfa.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/itext.pdfua.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/itext.sign.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/itext.styledxmlparser.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/itext.svg.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/itext.commons.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.AspNetCore.Authentication.JwtBearer.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.Bcl.AsyncInterfaces.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.CodeAnalysis.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.CodeAnalysis.CSharp.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.CodeAnalysis.CSharp.Workspaces.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.CodeAnalysis.Workspaces.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.DotNet.PlatformAbstractions.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.EntityFrameworkCore.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.EntityFrameworkCore.Abstractions.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.EntityFrameworkCore.Design.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.EntityFrameworkCore.Relational.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.Extensions.Configuration.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.Extensions.Configuration.Abstractions.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.Extensions.DependencyInjection.Abstractions.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.Extensions.DependencyModel.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.Extensions.Diagnostics.Abstractions.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.Extensions.FileProviders.Abstractions.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.Extensions.Hosting.Abstractions.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.Extensions.Logging.Abstractions.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.Extensions.Options.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.Extensions.Primitives.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.Identity.Client.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.Identity.Client.Extensions.Msal.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.IdentityModel.Abstractions.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.IdentityModel.JsonWebTokens.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.IdentityModel.Logging.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.IdentityModel.Protocols.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.IdentityModel.Tokens.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Microsoft.OpenApi.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Mono.TextTemplating.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Npgsql.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Npgsql.EntityFrameworkCore.PostgreSQL.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/SixLabors.ImageSharp.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Swashbuckle.AspNetCore.Swagger.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Swashbuckle.AspNetCore.SwaggerGen.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Swashbuckle.AspNetCore.SwaggerUI.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/System.ClientModel.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/System.CodeDom.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/System.Composition.AttributedModel.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/System.Composition.Convention.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/System.Composition.Hosting.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/System.Composition.Runtime.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/System.Composition.TypedParts.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/System.Diagnostics.DiagnosticSource.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/System.IdentityModel.Tokens.Jwt.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/System.IO.Pipelines.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/System.Memory.Data.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/System.Security.Cryptography.ProtectedData.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/System.Text.Encodings.Web.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/System.Text.Json.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/cs/Microsoft.CodeAnalysis.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/de/Microsoft.CodeAnalysis.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/es/Microsoft.CodeAnalysis.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/fr/Microsoft.CodeAnalysis.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/it/Microsoft.CodeAnalysis.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/ja/Microsoft.CodeAnalysis.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/ko/Microsoft.CodeAnalysis.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/pl/Microsoft.CodeAnalysis.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/pt-BR/Microsoft.CodeAnalysis.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/ru/Microsoft.CodeAnalysis.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/tr/Microsoft.CodeAnalysis.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/zh-Hans/Microsoft.CodeAnalysis.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/zh-Hant/Microsoft.CodeAnalysis.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/cs/Microsoft.CodeAnalysis.CSharp.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/de/Microsoft.CodeAnalysis.CSharp.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/es/Microsoft.CodeAnalysis.CSharp.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/fr/Microsoft.CodeAnalysis.CSharp.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/it/Microsoft.CodeAnalysis.CSharp.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/ja/Microsoft.CodeAnalysis.CSharp.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/ko/Microsoft.CodeAnalysis.CSharp.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/pl/Microsoft.CodeAnalysis.CSharp.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/pt-BR/Microsoft.CodeAnalysis.CSharp.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/ru/Microsoft.CodeAnalysis.CSharp.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/tr/Microsoft.CodeAnalysis.CSharp.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/zh-Hans/Microsoft.CodeAnalysis.CSharp.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/zh-Hant/Microsoft.CodeAnalysis.CSharp.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/cs/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/de/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/es/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/fr/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/it/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/ja/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/ko/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/pl/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/pt-BR/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/ru/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/tr/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/zh-Hans/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/zh-Hant/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/cs/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/de/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/es/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/fr/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/it/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/ja/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/ko/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/pl/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/pt-BR/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/ru/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/tr/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/zh-Hans/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/zh-Hant/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/runtimes/win/lib/netstandard2.0/System.Security.Cryptography.ProtectedData.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/runtimes/browser/lib/net8.0/System.Text.Encodings.Web.dll
+/volume1/Online Server/prestexa-los/api/obj/Debug/net8.0/PrestexaAPI.csproj.AssemblyReference.cache
+/volume1/Online Server/prestexa-los/api/obj/Debug/net8.0/PrestexaAPI.GeneratedMSBuildEditorConfig.editorconfig
+/volume1/Online Server/prestexa-los/api/obj/Debug/net8.0/PrestexaAPI.AssemblyInfoInputs.cache
+/volume1/Online Server/prestexa-los/api/obj/Debug/net8.0/PrestexaAPI.AssemblyInfo.cs
+/volume1/Online Server/prestexa-los/api/obj/Debug/net8.0/PrestexaAPI.csproj.CoreCompileInputs.cache
+/volume1/Online Server/prestexa-los/api/obj/Debug/net8.0/PrestexaAPI.MvcApplicationPartsAssemblyInfo.cs
+/volume1/Online Server/prestexa-los/api/obj/Debug/net8.0/PrestexaAPI.MvcApplicationPartsAssemblyInfo.cache
+/volume1/Online Server/prestexa-los/api/obj/Debug/net8.0/staticwebassets.build.json
+/volume1/Online Server/prestexa-los/api/obj/Debug/net8.0/staticwebassets.development.json
+/volume1/Online Server/prestexa-los/api/obj/Debug/net8.0/staticwebassets/msbuild.PrestexaAPI.Microsoft.AspNetCore.StaticWebAssets.props
+/volume1/Online Server/prestexa-los/api/obj/Debug/net8.0/staticwebassets/msbuild.build.PrestexaAPI.props
+/volume1/Online Server/prestexa-los/api/obj/Debug/net8.0/staticwebassets/msbuild.buildMultiTargeting.PrestexaAPI.props
+/volume1/Online Server/prestexa-los/api/obj/Debug/net8.0/staticwebassets/msbuild.buildTransitive.PrestexaAPI.props
+/volume1/Online Server/prestexa-los/api/obj/Debug/net8.0/staticwebassets.pack.json
+/volume1/Online Server/prestexa-los/api/obj/Debug/net8.0/scopedcss/bundle/PrestexaAPI.styles.css
+/volume1/Online Server/prestexa-los/api/obj/Debug/net8.0/PrestexaAPI.csproj.CopyComplete
+/volume1/Online Server/prestexa-los/api/obj/Debug/net8.0/PrestexaAPI.dll
+/volume1/Online Server/prestexa-los/api/obj/Debug/net8.0/refint/PrestexaAPI.dll
+/volume1/Online Server/prestexa-los/api/obj/Debug/net8.0/PrestexaAPI.pdb
+/volume1/Online Server/prestexa-los/api/obj/Debug/net8.0/PrestexaAPI.genruntimeconfig.cache
+/volume1/Online Server/prestexa-los/api/obj/Debug/net8.0/ref/PrestexaAPI.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Otp.NET.dll
+/src/bin/Debug/net8.0/appsettings.Development.json
+/src/bin/Debug/net8.0/appsettings.json
+/src/bin/Debug/net8.0/PrestexaAPI
+/src/bin/Debug/net8.0/PrestexaAPI.deps.json
+/src/bin/Debug/net8.0/PrestexaAPI.runtimeconfig.json
+/src/bin/Debug/net8.0/PrestexaAPI.dll
+/src/bin/Debug/net8.0/PrestexaAPI.pdb
+/src/bin/Debug/net8.0/Azure.Core.dll
+/src/bin/Debug/net8.0/Azure.Extensions.AspNetCore.Configuration.Secrets.dll
+/src/bin/Debug/net8.0/Azure.Identity.dll
+/src/bin/Debug/net8.0/Azure.Security.KeyVault.Secrets.dll
+/src/bin/Debug/net8.0/BCrypt-Net-Next.dll
+/src/bin/Debug/net8.0/Humanizer.dll
+/src/bin/Debug/net8.0/itext.barcodes.dll
+/src/bin/Debug/net8.0/itext.bouncy-castle-connector.dll
+/src/bin/Debug/net8.0/itext.forms.dll
+/src/bin/Debug/net8.0/itext.io.dll
+/src/bin/Debug/net8.0/itext.kernel.dll
+/src/bin/Debug/net8.0/itext.layout.dll
+/src/bin/Debug/net8.0/itext.pdfa.dll
+/src/bin/Debug/net8.0/itext.pdfua.dll
+/src/bin/Debug/net8.0/itext.sign.dll
+/src/bin/Debug/net8.0/itext.styledxmlparser.dll
+/src/bin/Debug/net8.0/itext.svg.dll
+/src/bin/Debug/net8.0/itext.commons.dll
+/src/bin/Debug/net8.0/Microsoft.AspNetCore.Authentication.JwtBearer.dll
+/src/bin/Debug/net8.0/Microsoft.Bcl.AsyncInterfaces.dll
+/src/bin/Debug/net8.0/Microsoft.CodeAnalysis.dll
+/src/bin/Debug/net8.0/Microsoft.CodeAnalysis.CSharp.dll
+/src/bin/Debug/net8.0/Microsoft.CodeAnalysis.CSharp.Workspaces.dll
+/src/bin/Debug/net8.0/Microsoft.CodeAnalysis.Workspaces.dll
+/src/bin/Debug/net8.0/Microsoft.DotNet.PlatformAbstractions.dll
+/src/bin/Debug/net8.0/Microsoft.EntityFrameworkCore.dll
+/src/bin/Debug/net8.0/Microsoft.EntityFrameworkCore.Abstractions.dll
+/src/bin/Debug/net8.0/Microsoft.EntityFrameworkCore.Design.dll
+/src/bin/Debug/net8.0/Microsoft.EntityFrameworkCore.Relational.dll
+/src/bin/Debug/net8.0/Microsoft.Extensions.Configuration.dll
+/src/bin/Debug/net8.0/Microsoft.Extensions.Configuration.Abstractions.dll
+/src/bin/Debug/net8.0/Microsoft.Extensions.DependencyInjection.Abstractions.dll
+/src/bin/Debug/net8.0/Microsoft.Extensions.DependencyModel.dll
+/src/bin/Debug/net8.0/Microsoft.Extensions.Diagnostics.Abstractions.dll
+/src/bin/Debug/net8.0/Microsoft.Extensions.FileProviders.Abstractions.dll
+/src/bin/Debug/net8.0/Microsoft.Extensions.Hosting.Abstractions.dll
+/src/bin/Debug/net8.0/Microsoft.Extensions.Logging.Abstractions.dll
+/src/bin/Debug/net8.0/Microsoft.Extensions.Options.dll
+/src/bin/Debug/net8.0/Microsoft.Extensions.Primitives.dll
+/src/bin/Debug/net8.0/Microsoft.Identity.Client.dll
+/src/bin/Debug/net8.0/Microsoft.Identity.Client.Extensions.Msal.dll
+/src/bin/Debug/net8.0/Microsoft.IdentityModel.Abstractions.dll
+/src/bin/Debug/net8.0/Microsoft.IdentityModel.JsonWebTokens.dll
+/src/bin/Debug/net8.0/Microsoft.IdentityModel.Logging.dll
+/src/bin/Debug/net8.0/Microsoft.IdentityModel.Protocols.dll
+/src/bin/Debug/net8.0/Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
+/src/bin/Debug/net8.0/Microsoft.IdentityModel.Tokens.dll
+/src/bin/Debug/net8.0/Microsoft.OpenApi.dll
+/src/bin/Debug/net8.0/Mono.TextTemplating.dll
+/src/bin/Debug/net8.0/Npgsql.dll
+/src/bin/Debug/net8.0/Npgsql.EntityFrameworkCore.PostgreSQL.dll
+/src/bin/Debug/net8.0/Otp.NET.dll
+/src/bin/Debug/net8.0/SixLabors.ImageSharp.dll
+/src/bin/Debug/net8.0/Swashbuckle.AspNetCore.Swagger.dll
+/src/bin/Debug/net8.0/Swashbuckle.AspNetCore.SwaggerGen.dll
+/src/bin/Debug/net8.0/Swashbuckle.AspNetCore.SwaggerUI.dll
+/src/bin/Debug/net8.0/System.ClientModel.dll
+/src/bin/Debug/net8.0/System.CodeDom.dll
+/src/bin/Debug/net8.0/System.Composition.AttributedModel.dll
+/src/bin/Debug/net8.0/System.Composition.Convention.dll
+/src/bin/Debug/net8.0/System.Composition.Hosting.dll
+/src/bin/Debug/net8.0/System.Composition.Runtime.dll
+/src/bin/Debug/net8.0/System.Composition.TypedParts.dll
+/src/bin/Debug/net8.0/System.Diagnostics.DiagnosticSource.dll
+/src/bin/Debug/net8.0/System.IdentityModel.Tokens.Jwt.dll
+/src/bin/Debug/net8.0/System.IO.Pipelines.dll
+/src/bin/Debug/net8.0/System.Memory.Data.dll
+/src/bin/Debug/net8.0/System.Security.Cryptography.ProtectedData.dll
+/src/bin/Debug/net8.0/System.Text.Encodings.Web.dll
+/src/bin/Debug/net8.0/System.Text.Json.dll
+/src/bin/Debug/net8.0/cs/Microsoft.CodeAnalysis.resources.dll
+/src/bin/Debug/net8.0/de/Microsoft.CodeAnalysis.resources.dll
+/src/bin/Debug/net8.0/es/Microsoft.CodeAnalysis.resources.dll
+/src/bin/Debug/net8.0/fr/Microsoft.CodeAnalysis.resources.dll
+/src/bin/Debug/net8.0/it/Microsoft.CodeAnalysis.resources.dll
+/src/bin/Debug/net8.0/ja/Microsoft.CodeAnalysis.resources.dll
+/src/bin/Debug/net8.0/ko/Microsoft.CodeAnalysis.resources.dll
+/src/bin/Debug/net8.0/pl/Microsoft.CodeAnalysis.resources.dll
+/src/bin/Debug/net8.0/pt-BR/Microsoft.CodeAnalysis.resources.dll
+/src/bin/Debug/net8.0/ru/Microsoft.CodeAnalysis.resources.dll
+/src/bin/Debug/net8.0/tr/Microsoft.CodeAnalysis.resources.dll
+/src/bin/Debug/net8.0/zh-Hans/Microsoft.CodeAnalysis.resources.dll
+/src/bin/Debug/net8.0/zh-Hant/Microsoft.CodeAnalysis.resources.dll
+/src/bin/Debug/net8.0/cs/Microsoft.CodeAnalysis.CSharp.resources.dll
+/src/bin/Debug/net8.0/de/Microsoft.CodeAnalysis.CSharp.resources.dll
+/src/bin/Debug/net8.0/es/Microsoft.CodeAnalysis.CSharp.resources.dll
+/src/bin/Debug/net8.0/fr/Microsoft.CodeAnalysis.CSharp.resources.dll
+/src/bin/Debug/net8.0/it/Microsoft.CodeAnalysis.CSharp.resources.dll
+/src/bin/Debug/net8.0/ja/Microsoft.CodeAnalysis.CSharp.resources.dll
+/src/bin/Debug/net8.0/ko/Microsoft.CodeAnalysis.CSharp.resources.dll
+/src/bin/Debug/net8.0/pl/Microsoft.CodeAnalysis.CSharp.resources.dll
+/src/bin/Debug/net8.0/pt-BR/Microsoft.CodeAnalysis.CSharp.resources.dll
+/src/bin/Debug/net8.0/ru/Microsoft.CodeAnalysis.CSharp.resources.dll
+/src/bin/Debug/net8.0/tr/Microsoft.CodeAnalysis.CSharp.resources.dll
+/src/bin/Debug/net8.0/zh-Hans/Microsoft.CodeAnalysis.CSharp.resources.dll
+/src/bin/Debug/net8.0/zh-Hant/Microsoft.CodeAnalysis.CSharp.resources.dll
+/src/bin/Debug/net8.0/cs/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+/src/bin/Debug/net8.0/de/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+/src/bin/Debug/net8.0/es/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+/src/bin/Debug/net8.0/fr/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+/src/bin/Debug/net8.0/it/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+/src/bin/Debug/net8.0/ja/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+/src/bin/Debug/net8.0/ko/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+/src/bin/Debug/net8.0/pl/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+/src/bin/Debug/net8.0/pt-BR/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+/src/bin/Debug/net8.0/ru/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+/src/bin/Debug/net8.0/tr/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+/src/bin/Debug/net8.0/zh-Hans/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+/src/bin/Debug/net8.0/zh-Hant/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+/src/bin/Debug/net8.0/cs/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/src/bin/Debug/net8.0/de/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/src/bin/Debug/net8.0/es/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/src/bin/Debug/net8.0/fr/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/src/bin/Debug/net8.0/it/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/src/bin/Debug/net8.0/ja/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/src/bin/Debug/net8.0/ko/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/src/bin/Debug/net8.0/pl/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/src/bin/Debug/net8.0/pt-BR/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/src/bin/Debug/net8.0/ru/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/src/bin/Debug/net8.0/tr/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/src/bin/Debug/net8.0/zh-Hans/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/src/bin/Debug/net8.0/zh-Hant/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/src/bin/Debug/net8.0/runtimes/win/lib/netstandard2.0/System.Security.Cryptography.ProtectedData.dll
+/src/bin/Debug/net8.0/runtimes/browser/lib/net8.0/System.Text.Encodings.Web.dll
+/src/obj/Debug/net8.0/PrestexaAPI.csproj.AssemblyReference.cache
+/src/obj/Debug/net8.0/PrestexaAPI.GeneratedMSBuildEditorConfig.editorconfig
+/src/obj/Debug/net8.0/PrestexaAPI.AssemblyInfoInputs.cache
+/src/obj/Debug/net8.0/PrestexaAPI.AssemblyInfo.cs
+/src/obj/Debug/net8.0/PrestexaAPI.csproj.CoreCompileInputs.cache
+/src/obj/Debug/net8.0/PrestexaAPI.MvcApplicationPartsAssemblyInfo.cs
+/src/obj/Debug/net8.0/PrestexaAPI.MvcApplicationPartsAssemblyInfo.cache
+/src/obj/Debug/net8.0/staticwebassets.build.json
+/src/obj/Debug/net8.0/staticwebassets.development.json
+/src/obj/Debug/net8.0/staticwebassets/msbuild.PrestexaAPI.Microsoft.AspNetCore.StaticWebAssets.props
+/src/obj/Debug/net8.0/staticwebassets/msbuild.build.PrestexaAPI.props
+/src/obj/Debug/net8.0/staticwebassets/msbuild.buildMultiTargeting.PrestexaAPI.props
+/src/obj/Debug/net8.0/staticwebassets/msbuild.buildTransitive.PrestexaAPI.props
+/src/obj/Debug/net8.0/staticwebassets.pack.json
+/src/obj/Debug/net8.0/scopedcss/bundle/PrestexaAPI.styles.css
+/src/obj/Debug/net8.0/Prestexa.0F21398A.Up2Date
+/src/obj/Debug/net8.0/PrestexaAPI.dll
+/src/obj/Debug/net8.0/refint/PrestexaAPI.dll
+/src/obj/Debug/net8.0/PrestexaAPI.pdb
+/src/obj/Debug/net8.0/PrestexaAPI.genruntimeconfig.cache
+/src/obj/Debug/net8.0/ref/PrestexaAPI.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/Newtonsoft.Json.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/SendGrid.dll
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/StarkbankEcdsa.dll
+/src/bin/Debug/net8.0/Newtonsoft.Json.dll
+/src/bin/Debug/net8.0/SendGrid.dll
+/src/bin/Debug/net8.0/StarkbankEcdsa.dll

@@ -1,0 +1,6 @@
+@PrestexaAPI_HostAddress = http://localhost:5296
+
+GET {{PrestexaAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

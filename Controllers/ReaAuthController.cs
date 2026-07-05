@@ -1,0 +1,368 @@
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using PrestexaAPI.Data;
+using PrestexaAPI.Models;
+using PrestexaAPI.Models.Requests;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
+using PrestexaAPI.Services;
+
+namespace PrestexaAPI.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class ReaAuthController : ControllerBase
+    {
+        private readonly AppDbContext _context;
+        private readonly IConfiguration _config;
+
+        private const int OtpTokenMinutes = 10;
+        private const int FinalTokenHours = 8;
+        private readonly IEmailSender _emailSender;
+
+        public ReaAuthController(AppDbContext context, IConfiguration config, IEmailSender emailSender)
+        {
+            _context = context;
+            _config = config;
+            _emailSender = emailSender;
+        }
+
+        [HttpPost("register")]
+public async Task<IActionResult> Register([FromBody] PortalRegisterRequest request)
+{
+    if (!ModelState.IsValid)
+        return BadRequest(ModelState);
+
+    var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+
+    var company = await _context.Companies
+        .FirstOrDefaultAsync(c => c.NmlsNumber == request.NmlsNumber && c.IsActive);
+
+    if (company == null)
+        return BadRequest("Invalid or inactive company.");
+
+    var existingUser = await _context.Users
+        .FirstOrDefaultAsync(u => u.Email == normalizedEmail);
+
+    if (existingUser != null)
+        return BadRequest("User already exists.");
+
+    var user = new User
+    {
+        CompanyNmlsNumber = company.NmlsNumber,
+        FirstName = request.FirstName.Trim(),
+        MiddleName = string.IsNullOrWhiteSpace(request.MiddleName)
+            ? null
+            : request.MiddleName.Trim(),
+        LastName = request.LastName.Trim(),
+        Email = normalizedEmail,
+        PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+        PhoneNumber = request.PhoneNumber,
+
+        Role = "REA",
+        Status = UserStatus.Active,
+
+        TwoFactorEnabled = false,
+        TwoFactorSecret = null
+    };
+
+    _context.Users.Add(user);
+    await _context.SaveChangesAsync();
+
+    return Ok(new
+    {
+        message = "Real estate agent registered successfully.",
+        user.Id,
+        user.Email,
+        user.Role,
+        user.CompanyNmlsNumber,
+        CompanyName = company.Name
+    });
+}
+
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] PortalLoginRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var user = await _context.Users
+                .Include(u => u.Company)
+                .FirstOrDefaultAsync(u => u.Email == request.Email);
+
+            if (user == null)
+                return Unauthorized("Invalid credentials.");
+
+            if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+                return Unauthorized("Invalid credentials.");
+
+            if (!IsRea(user))
+                return Unauthorized("This account is not a real estate agent account.");
+
+            if (user.Status != UserStatus.Active)
+                return Unauthorized("User is not active.");
+
+            if (user.Company != null && !user.Company.IsActive)
+                return Unauthorized("Company is inactive.");
+
+            user.LastLoginAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            var code = GenerateSixDigitCode();
+            var otpToken = CreateOtpTemporaryToken(user, "rea_otp", code);
+
+            await _emailSender.SendEmailAsync(
+    user.Email,
+    "Your Prestexa CRM verification code",
+    $"Your Prestexa CRM verification code is {code}. This code expires in 10 minutes.",
+    $@"
+        <div style=""font-family:Arial,sans-serif;color:#111827;"">
+            <h2>Your Prestexa CRM verification code</h2>
+            <p>Use the code below to complete your real estate agent login.</p>
+            <div style=""font-size:28px;font-weight:bold;letter-spacing:4px;margin:20px 0;"">
+                {code}
+            </div>
+            <p>This code expires in 10 minutes.</p>
+            <p>If you did not request this code, you can ignore this email.</p>
+        </div>
+    "
+);
+
+            var response = new Dictionary<string, object?>
+            {
+                ["requiresOtp"] = true,
+                ["otpToken"] = otpToken,
+                ["email"] = user.Email,
+                ["message"] = "Verification code is required."
+            };
+
+            if (ShouldReturnOtpForTesting())
+            {
+                response["verificationCodeForTesting"] = code;
+            }
+
+            return Ok(response);
+        }
+
+        [HttpPost("verify-login")]
+        public async Task<IActionResult> VerifyLogin([FromBody] PortalVerifyOtpRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var principal = ValidateOtpTemporaryToken(
+                request.OtpToken,
+                "rea_otp",
+                request.Code
+            );
+
+            if (principal == null)
+                return Unauthorized("Invalid or expired verification code.");
+
+            var userIdValue = principal.FindFirst("UserId")?.Value;
+
+            if (!int.TryParse(userIdValue, out var userId))
+                return Unauthorized("Invalid verification token.");
+
+            var user = await _context.Users
+                .Include(u => u.Company)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null)
+                return Unauthorized("User not found.");
+
+            if (!IsRea(user))
+                return Unauthorized("This account is not a real estate agent account.");
+
+            if (user.Status != UserStatus.Active)
+                return Unauthorized("User is not active.");
+
+            if (user.Company != null && !user.Company.IsActive)
+                return Unauthorized("Company is inactive.");
+
+            user.LastLoginAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            var finalToken = CreateFinalJwtToken(user, "rea");
+
+            return Ok(new
+            {
+                token = finalToken,
+                user = BuildUserResponse(user),
+                message = "REA login successful."
+            });
+        }
+
+        [HttpPost("forgot-password")]
+        public IActionResult ForgotPassword([FromBody] PortalForgotPasswordRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            return Ok(new
+            {
+                message = "If an account exists with that email, password reset instructions have been sent."
+            });
+        }
+
+        private static bool IsRea(User user)
+        {
+            var role = user.Role?.Trim();
+
+            return string.Equals(role, "REA", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(role, "Rea", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(role, "RealEstateAgent", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(role, "Agent", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private string CreateFinalJwtToken(User user, string portal)
+        {
+            var jwtKey = _config["Jwt:Key"];
+
+            if (string.IsNullOrWhiteSpace(jwtKey))
+                throw new Exception("JWT Key missing.");
+
+            var claims = new[]
+            {
+                new Claim(ClaimTypes.Name, user.Email),
+                new Claim("UserId", user.Id.ToString()),
+                new Claim("CompanyNmlsNumber", user.CompanyNmlsNumber ?? ""),
+                new Claim(ClaimTypes.Role, user.Role),
+                new Claim("Portal", portal)
+            };
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+
+            var token = new JwtSecurityToken(
+                claims: claims,
+                expires: DateTime.UtcNow.AddHours(FinalTokenHours),
+                signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256)
+            );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        private string CreateOtpTemporaryToken(User user, string purpose, string code)
+        {
+            var jwtKey = _config["Jwt:Key"];
+
+            if (string.IsNullOrWhiteSpace(jwtKey))
+                throw new Exception("JWT Key missing.");
+
+            var tokenId = Guid.NewGuid().ToString("N");
+            var codeHash = HashOtpCode(code, tokenId, jwtKey);
+
+            var claims = new[]
+            {
+                new Claim("UserId", user.Id.ToString()),
+                new Claim("Email", user.Email),
+                new Claim("Purpose", purpose),
+                new Claim("TokenId", tokenId),
+                new Claim("CodeHash", codeHash)
+            };
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+
+            var token = new JwtSecurityToken(
+                claims: claims,
+                expires: DateTime.UtcNow.AddMinutes(OtpTokenMinutes),
+                signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256)
+            );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        private ClaimsPrincipal? ValidateOtpTemporaryToken(
+            string token,
+            string expectedPurpose,
+            string enteredCode)
+        {
+            try
+            {
+                var jwtKey = _config["Jwt:Key"];
+
+                if (string.IsNullOrWhiteSpace(jwtKey))
+                    throw new Exception("JWT Key missing.");
+
+                var tokenHandler = new JwtSecurityTokenHandler();
+                var key = Encoding.UTF8.GetBytes(jwtKey);
+
+                var principal = tokenHandler.ValidateToken(
+                    token,
+                    new TokenValidationParameters
+                    {
+                        ValidateIssuer = false,
+                        ValidateAudience = false,
+                        ValidateLifetime = true,
+                        ValidateIssuerSigningKey = true,
+                        ClockSkew = TimeSpan.Zero,
+                        IssuerSigningKey = new SymmetricSecurityKey(key)
+                    },
+                    out _
+                );
+
+                var purpose = principal.FindFirst("Purpose")?.Value;
+                var tokenId = principal.FindFirst("TokenId")?.Value;
+                var expectedHash = principal.FindFirst("CodeHash")?.Value;
+
+                if (!string.Equals(purpose, expectedPurpose, StringComparison.Ordinal))
+                    return null;
+
+                if (string.IsNullOrWhiteSpace(tokenId) || string.IsNullOrWhiteSpace(expectedHash))
+                    return null;
+
+                var cleanCode = new string(enteredCode.Where(char.IsDigit).ToArray());
+
+                if (cleanCode.Length != 6)
+                    return null;
+
+                var actualHash = HashOtpCode(cleanCode, tokenId, jwtKey);
+
+                if (!CryptographicOperations.FixedTimeEquals(
+                        Encoding.UTF8.GetBytes(actualHash),
+                        Encoding.UTF8.GetBytes(expectedHash)))
+                {
+                    return null;
+                }
+
+                return principal;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static string GenerateSixDigitCode()
+        {
+            return RandomNumberGenerator.GetInt32(0, 1000000).ToString("D6");
+        }
+
+        private static string HashOtpCode(string code, string tokenId, string secret)
+        {
+            var payload = $"{code}:{tokenId}:{secret}";
+            var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(payload));
+            return Convert.ToBase64String(bytes);
+        }
+
+        private bool ShouldReturnOtpForTesting()
+        {
+            return bool.TryParse(_config["Auth:ReturnOtpForTesting"], out var value) && value;
+        }
+
+        private static object BuildUserResponse(User user)
+        {
+            return new
+            {
+                user.Id,
+                user.Email,
+                user.Role,
+                user.CompanyNmlsNumber,
+                CompanyName = user.Company?.Name
+            };
+        }
+    }
+}
