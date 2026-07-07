@@ -6,6 +6,7 @@ using OtpNet;
 using PrestexaAPI.Data;
 using PrestexaAPI.Models;
 using PrestexaAPI.Models.Requests;
+using PrestexaAPI.Services;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -19,16 +20,21 @@ namespace PrestexaAPI.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IConfiguration _config;
+        private readonly IAuthTokenService _authTokenService;
 
         private const string IssuerName = "Prestexa";
         private const int TwoFactorTemporaryTokenMinutes = 10;
         private const int EmployeeMfaRememberHours = 30;
         private const string EmployeePortal = "los";
 
-        public AuthController(AppDbContext context, IConfiguration config)
+        public AuthController(
+            AppDbContext context,
+            IConfiguration config,
+            IAuthTokenService authTokenService)
         {
             _context = context;
             _config = config;
+            _authTokenService = authTokenService;
         }
 
         // ============================================================
@@ -76,7 +82,7 @@ namespace PrestexaAPI.Controllers
 
             return Ok(new
             {
-                message = "User registered successfully",
+                message = "User registered successfully.",
                 user.Id,
                 user.CompanyNmlsNumber,
                 user.Email,
@@ -195,6 +201,14 @@ namespace PrestexaAPI.Controllers
             if (loginState.IsUsed)
                 return BadRequest("Login state already used.");
 
+            var jwtPortal = User.FindFirst("Portal")?.Value?.Trim().ToLowerInvariant();
+
+            if (string.IsNullOrWhiteSpace(jwtPortal))
+                return Unauthorized("Token portal is missing.");
+
+            if (!string.Equals(jwtPortal, loginState.Portal, StringComparison.OrdinalIgnoreCase))
+                return Forbid("Token portal does not match login state portal.");
+
             if (!IsAllowedPrestexaReturnUrl(
                     loginState.ReturnUrl,
                     loginState.Portal,
@@ -244,6 +258,9 @@ namespace PrestexaAPI.Controllers
             if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
                 return Unauthorized("Invalid credentials.");
 
+            if (!RequiresEmployeeAuthenticator(user))
+                return Unauthorized("Use the appropriate portal login for this account.");
+
             if (user.Company == null || !user.Company.IsActive)
                 return Unauthorized("Company is inactive.");
 
@@ -252,17 +269,6 @@ namespace PrestexaAPI.Controllers
 
             user.LastLoginAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
-
-            if (!RequiresEmployeeAuthenticator(user))
-            {
-                var token = CreateFinalJwtToken(user);
-
-                return Ok(new
-                {
-                    token,
-                    user = BuildUserResponse(user)
-                });
-            }
 
             if (!user.TwoFactorEnabled)
             {
@@ -293,7 +299,10 @@ namespace PrestexaAPI.Controllers
 
             if (hasTrustedDevice)
             {
-                var finalToken = CreateFinalJwtToken(user);
+                var finalToken = await _authTokenService.CreateFinalJwtTokenAsync(
+                    user,
+                    EmployeePortal
+                );
 
                 return Ok(new
                 {
@@ -367,7 +376,10 @@ namespace PrestexaAPI.Controllers
 
             await _context.SaveChangesAsync();
 
-            var finalToken = CreateFinalJwtToken(user);
+            var finalToken = await _authTokenService.CreateFinalJwtTokenAsync(
+                user,
+                EmployeePortal
+            );
 
             return Ok(new
             {
@@ -427,7 +439,10 @@ namespace PrestexaAPI.Controllers
 
             await _context.SaveChangesAsync();
 
-            var finalToken = CreateFinalJwtToken(user);
+            var finalToken = await _authTokenService.CreateFinalJwtTokenAsync(
+                user,
+                EmployeePortal
+            );
 
             return Ok(new
             {
@@ -626,35 +641,8 @@ namespace PrestexaAPI.Controllers
         }
 
         // ============================================================
-        // JWT / MFA HELPERS
+        // MFA HELPERS
         // ============================================================
-        private string CreateFinalJwtToken(User user)
-        {
-            var jwtKey = _config["Jwt:Key"];
-
-            if (string.IsNullOrWhiteSpace(jwtKey))
-                throw new Exception("JWT Key missing.");
-
-            var claims = new[]
-            {
-                new Claim(ClaimTypes.Name, user.Email),
-                new Claim("UserId", user.Id.ToString()),
-                new Claim("CompanyNmlsNumber", user.CompanyNmlsNumber),
-                new Claim(ClaimTypes.Role, user.Role),
-                new Claim("Portal", EmployeePortal)
-            };
-
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
-
-            var token = new JwtSecurityToken(
-                claims: claims,
-                expires: DateTime.UtcNow.AddHours(8),
-                signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256)
-            );
-
-            return new JwtSecurityTokenHandler().WriteToken(token);
-        }
-
         private string CreateTwoFactorTemporaryToken(User user, string purpose)
         {
             var jwtKey = _config["Jwt:Key"];

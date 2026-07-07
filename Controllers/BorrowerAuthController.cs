@@ -1,4 +1,3 @@
-
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -20,83 +19,95 @@ namespace PrestexaAPI.Controllers
         private readonly AppDbContext _context;
         private readonly IConfiguration _config;
         private readonly IEmailSender _emailSender;
+        private readonly IAuthTokenService _authTokenService;
+        private readonly ITrustedDeviceService _trustedDeviceService;
 
         private const int OtpTokenMinutes = 10;
-        private const int FinalTokenHours = 8;
+        private const string BorrowerPortal = "borrower";
+        private static readonly TimeSpan BorrowerRememberDuration = TimeSpan.FromDays(7);
 
         public BorrowerAuthController(
             AppDbContext context,
             IConfiguration config,
-            IEmailSender emailSender)
+            IEmailSender emailSender,
+            IAuthTokenService authTokenService,
+            ITrustedDeviceService trustedDeviceService)
         {
             _context = context;
             _config = config;
             _emailSender = emailSender;
+            _authTokenService = authTokenService;
+            _trustedDeviceService = trustedDeviceService;
         }
 
-
+        // ============================================================
+        // REGISTER BORROWER
+        // ============================================================
         [HttpPost("register")]
-public async Task<IActionResult> Register([FromBody] PortalRegisterRequest request)
-{
-    if (!ModelState.IsValid)
-        return BadRequest(ModelState);
+        public async Task<IActionResult> Register([FromBody] PortalRegisterRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
 
-    var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+            var normalizedEmail = request.Email.Trim().ToLowerInvariant();
 
-    var company = await _context.Companies
-        .FirstOrDefaultAsync(c => c.NmlsNumber == request.NmlsNumber && c.IsActive);
+            var company = await _context.Companies
+                .FirstOrDefaultAsync(c => c.NmlsNumber == request.NmlsNumber && c.IsActive);
 
-    if (company == null)
-        return BadRequest("Invalid or inactive company.");
+            if (company == null)
+                return BadRequest("Invalid or inactive company.");
 
-    var existingUser = await _context.Users
-        .FirstOrDefaultAsync(u => u.Email == normalizedEmail);
+            var existingUser = await _context.Users
+                .FirstOrDefaultAsync(u => u.Email == normalizedEmail);
 
-    if (existingUser != null)
-        return BadRequest("User already exists.");
+            if (existingUser != null)
+                return BadRequest("User already exists.");
 
-    var user = new User
-    {
-        CompanyNmlsNumber = company.NmlsNumber,
-        FirstName = request.FirstName.Trim(),
-        MiddleName = string.IsNullOrWhiteSpace(request.MiddleName)
-            ? null
-            : request.MiddleName.Trim(),
-        LastName = request.LastName.Trim(),
-        Email = normalizedEmail,
-        PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-        PhoneNumber = request.PhoneNumber,
+            var user = new User
+            {
+                CompanyNmlsNumber = company.NmlsNumber,
+                FirstName = request.FirstName.Trim(),
+                MiddleName = string.IsNullOrWhiteSpace(request.MiddleName)
+                    ? null
+                    : request.MiddleName.Trim(),
+                LastName = request.LastName.Trim(),
+                Email = normalizedEmail,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+                PhoneNumber = request.PhoneNumber,
+                Role = "Borrower",
+                Status = UserStatus.Active,
+                TwoFactorEnabled = false,
+                TwoFactorSecret = null
+            };
 
-        Role = "Borrower",
-        Status = UserStatus.Active,
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
 
-        TwoFactorEnabled = false,
-        TwoFactorSecret = null
-    };
+            return Ok(new
+            {
+                message = "Borrower registered successfully.",
+                user.Id,
+                user.Email,
+                user.Role,
+                user.CompanyNmlsNumber,
+                CompanyName = company.Name
+            });
+        }
 
-    _context.Users.Add(user);
-    await _context.SaveChangesAsync();
-
-    return Ok(new
-    {
-        message = "Borrower registered successfully.",
-        user.Id,
-        user.Email,
-        user.Role,
-        user.CompanyNmlsNumber,
-        CompanyName = company.Name
-    });
-}
-
+        // ============================================================
+        // LOGIN BORROWER
+        // ============================================================
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] PortalLoginRequest request)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
+            var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+
             var user = await _context.Users
                 .Include(u => u.Company)
-                .FirstOrDefaultAsync(u => u.Email == request.Email);
+                .FirstOrDefaultAsync(u => u.Email == normalizedEmail);
 
             if (user == null)
                 return Unauthorized("Invalid credentials.");
@@ -115,6 +126,28 @@ public async Task<IActionResult> Register([FromBody] PortalRegisterRequest reque
 
             user.LastLoginAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
+
+            var isTrustedDevice = await _trustedDeviceService.IsTrustedAsync(
+                user.Id,
+                BorrowerPortal,
+                request.DeviceId
+            );
+
+            if (isTrustedDevice)
+            {
+                var finalToken = await _authTokenService.CreateFinalJwtTokenAsync(
+                    user,
+                    BorrowerPortal
+                );
+
+                return Ok(new
+                {
+                    token = finalToken,
+                    user = BuildUserResponse(user),
+                    mfaRemembered = true,
+                    message = "Borrower login successful. Verification was remembered for this device."
+                });
+            }
 
             var code = GenerateSixDigitCode();
             var otpToken = CreateOtpTemporaryToken(user, "borrower_otp", code);
@@ -152,6 +185,9 @@ public async Task<IActionResult> Register([FromBody] PortalRegisterRequest reque
             return Ok(response);
         }
 
+        // ============================================================
+        // VERIFY BORROWER OTP
+        // ============================================================
         [HttpPost("verify-login")]
         public async Task<IActionResult> VerifyLogin([FromBody] PortalVerifyOtpRequest request)
         {
@@ -189,9 +225,20 @@ public async Task<IActionResult> Register([FromBody] PortalRegisterRequest reque
                 return Unauthorized("Company is inactive.");
 
             user.LastLoginAt = DateTime.UtcNow;
+
+            await _trustedDeviceService.RememberAsync(
+                user.Id,
+                BorrowerPortal,
+                request.DeviceId,
+                BorrowerRememberDuration
+            );
+
             await _context.SaveChangesAsync();
 
-            var finalToken = CreateFinalJwtToken(user, "borrower");
+            var finalToken = await _authTokenService.CreateFinalJwtTokenAsync(
+                user,
+                BorrowerPortal
+            );
 
             return Ok(new
             {
@@ -201,6 +248,9 @@ public async Task<IActionResult> Register([FromBody] PortalRegisterRequest reque
             });
         }
 
+        // ============================================================
+        // FORGOT PASSWORD PLACEHOLDER
+        // ============================================================
         [HttpPost("forgot-password")]
         public IActionResult ForgotPassword([FromBody] PortalForgotPasswordRequest request)
         {
@@ -213,36 +263,12 @@ public async Task<IActionResult> Register([FromBody] PortalRegisterRequest reque
             });
         }
 
+        // ============================================================
+        // HELPERS
+        // ============================================================
         private static bool IsBorrower(User user)
         {
             return string.Equals(user.Role, "Borrower", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private string CreateFinalJwtToken(User user, string portal)
-        {
-            var jwtKey = _config["Jwt:Key"];
-
-            if (string.IsNullOrWhiteSpace(jwtKey))
-                throw new Exception("JWT Key missing.");
-
-            var claims = new[]
-            {
-                new Claim(ClaimTypes.Name, user.Email),
-                new Claim("UserId", user.Id.ToString()),
-                new Claim("CompanyNmlsNumber", user.CompanyNmlsNumber ?? ""),
-                new Claim(ClaimTypes.Role, user.Role),
-                new Claim("Portal", portal)
-            };
-
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
-
-            var token = new JwtSecurityToken(
-                claims: claims,
-                expires: DateTime.UtcNow.AddHours(FinalTokenHours),
-                signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256)
-            );
-
-            return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
         private string CreateOtpTemporaryToken(User user, string purpose, string code)

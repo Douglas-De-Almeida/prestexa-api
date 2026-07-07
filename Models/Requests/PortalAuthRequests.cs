@@ -33,6 +33,7 @@ namespace PrestexaAPI.Models.Requests
 
         [Required]
         public string Password { get; set; } = string.Empty;
+        public string? DeviceId { get; set; }
     }
 
     public class PortalVerifyOtpRequest
@@ -42,6 +43,7 @@ namespace PrestexaAPI.Models.Requests
 
         [Required]
         public string Code { get; set; } = string.Empty;
+        public string? DeviceId { get; set; }
     }
 
     public class PortalForgotPasswordRequest

@@ -28,6 +28,9 @@ namespace PrestexaAPI.Data
         public DbSet<MismoFile> MismoFiles { get; set; }
         public DbSet<LoginState> LoginStates { get; set; }
         public DbSet<TrustedMfaDevice> TrustedMfaDevices { get; set; }
+        public DbSet<UserSession> UserSessions { get; set; }
+        public DbSet<MediaAsset> MediaAssets => Set<MediaAsset>();
+        public DbSet<CompanyBranding> CompanyBrandings => Set<CompanyBranding>();
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -242,6 +245,49 @@ namespace PrestexaAPI.Data
                     _currentUser.IsSuperAdmin ||
                     (_currentUser.CompanyNmlsNumber != null &&
                      a.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            // ✅ Media Assets
+
+            modelBuilder.Entity<MediaAsset>()
+                .HasIndex(x => x.PublicId)
+                .IsUnique();
+
+            // ✅ Company Branding
+
+            modelBuilder.Entity<CompanyBranding>()
+                .HasIndex(x => x.CompanyNmlsNumber)
+                .IsUnique();
+
+            modelBuilder.Entity<CompanyBranding>()
+                .HasOne<Company>()
+                .WithMany()
+                .HasPrincipalKey(c => c.NmlsNumber)
+                .HasForeignKey(x => x.CompanyNmlsNumber)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<CompanyBranding>()
+                .HasOne(x => x.LightLogoAsset)
+                .WithMany()
+                .HasForeignKey(x => x.LightLogoAssetId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<CompanyBranding>()
+                .HasOne(x => x.DarkLogoAsset)
+                .WithMany()
+                .HasForeignKey(x => x.DarkLogoAssetId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<CompanyBranding>()
+                .HasOne(x => x.BackgroundAsset)
+                .WithMany()
+                .HasForeignKey(x => x.BackgroundAssetId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<CompanyBranding>()
+                .HasQueryFilter(b =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     b.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
         }
     }
 }

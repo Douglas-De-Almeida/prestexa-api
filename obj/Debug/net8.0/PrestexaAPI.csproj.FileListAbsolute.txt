@@ -308,3 +308,5 @@
 /src/bin/Debug/net8.0/Newtonsoft.Json.dll
 /src/bin/Debug/net8.0/SendGrid.dll
 /src/bin/Debug/net8.0/StarkbankEcdsa.dll
+/volume1/Online Server/prestexa-los/api/obj/Debug/net8.0/PrestexaAPI.sourcelink.json
+/src/obj/Debug/net8.0/PrestexaAPI.sourcelink.json

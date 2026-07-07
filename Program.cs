@@ -10,6 +10,10 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddScoped<ITrustedDeviceService, TrustedDeviceService>();
+
+builder.Services.AddScoped<IAuthTokenService, AuthTokenService>();
+
 builder.WebHost.ConfigureKestrel(serverOptions =>
 {
     serverOptions.Limits.MaxRequestBodySize = 15728640;

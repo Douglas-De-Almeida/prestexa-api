@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PrestexaAPI.Data;
@@ -11,9 +12,11 @@ using PrestexaAPI.Data;
 namespace PrestexaAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260706004135_AddUserSessionServerside")]
+    partial class AddUserSessionServerside
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -338,63 +341,6 @@ namespace PrestexaAPI.Migrations
                     b.ToTable("CompanyAssets");
                 });
 
-            modelBuilder.Entity("PrestexaAPI.Models.CompanyBranding", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("AccentColor")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int?>("BackgroundAssetId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("CompanyName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("CompanyNmlsNumber")
-                        .IsRequired()
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("DarkLogoAssetId")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<int?>("LightLogoAssetId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("PrimaryColor")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("SecondaryColor")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BackgroundAssetId");
-
-                    b.HasIndex("CompanyNmlsNumber")
-                        .IsUnique();
-
-                    b.HasIndex("DarkLogoAssetId");
-
-                    b.HasIndex("LightLogoAssetId");
-
-                    b.ToTable("CompanyBrandings");
-                });
-
             modelBuilder.Entity("PrestexaAPI.Models.Loan", b =>
                 {
                     b.Property<int>("Id")
@@ -554,46 +500,6 @@ namespace PrestexaAPI.Migrations
                     b.HasKey("StateId");
 
                     b.ToTable("LoginStates");
-                });
-
-            modelBuilder.Entity("PrestexaAPI.Models.MediaAsset", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("ContentType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("FileName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<long>("FileSizeBytes")
-                        .HasColumnType("bigint");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<Guid>("PublicId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("StoragePath")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("UploadedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PublicId")
-                        .IsUnique();
-
-                    b.ToTable("MediaAssets");
                 });
 
             modelBuilder.Entity("PrestexaAPI.Models.MismoFile", b =>
@@ -966,37 +872,6 @@ namespace PrestexaAPI.Migrations
                         .IsRequired();
 
                     b.Navigation("Company");
-                });
-
-            modelBuilder.Entity("PrestexaAPI.Models.CompanyBranding", b =>
-                {
-                    b.HasOne("PrestexaAPI.Models.MediaAsset", "BackgroundAsset")
-                        .WithMany()
-                        .HasForeignKey("BackgroundAssetId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("PrestexaAPI.Models.Company", null)
-                        .WithMany()
-                        .HasForeignKey("CompanyNmlsNumber")
-                        .HasPrincipalKey("NmlsNumber")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("PrestexaAPI.Models.MediaAsset", "DarkLogoAsset")
-                        .WithMany()
-                        .HasForeignKey("DarkLogoAssetId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("PrestexaAPI.Models.MediaAsset", "LightLogoAsset")
-                        .WithMany()
-                        .HasForeignKey("LightLogoAssetId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("BackgroundAsset");
-
-                    b.Navigation("DarkLogoAsset");
-
-                    b.Navigation("LightLogoAsset");
                 });
 
             modelBuilder.Entity("PrestexaAPI.Models.Loan", b =>
