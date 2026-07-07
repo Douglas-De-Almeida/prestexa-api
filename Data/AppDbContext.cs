@@ -29,8 +29,8 @@ namespace PrestexaAPI.Data
         public DbSet<LoginState> LoginStates { get; set; }
         public DbSet<TrustedMfaDevice> TrustedMfaDevices { get; set; }
         public DbSet<UserSession> UserSessions { get; set; }
-        public DbSet<MediaAsset> MediaAssets => Set<MediaAsset>();
-        public DbSet<CompanyBranding> CompanyBrandings => Set<CompanyBranding>();
+        public DbSet<PrestexaAPI.Models.MediaAsset> MediaAssets => Set<PrestexaAPI.Models.MediaAsset>();
+        public DbSet<PrestexaAPI.Models.CompanyBranding> CompanyBrandings => Set<PrestexaAPI.Models.CompanyBranding>();
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -248,42 +248,42 @@ namespace PrestexaAPI.Data
 
             // ✅ Media Assets
 
-            modelBuilder.Entity<MediaAsset>()
+            modelBuilder.Entity<PrestexaAPI.Models.MediaAsset>()
                 .HasIndex(x => x.PublicId)
                 .IsUnique();
 
             // ✅ Company Branding
 
-            modelBuilder.Entity<CompanyBranding>()
+            modelBuilder.Entity<PrestexaAPI.Models.CompanyBranding>()
                 .HasIndex(x => x.CompanyNmlsNumber)
                 .IsUnique();
 
-            modelBuilder.Entity<CompanyBranding>()
+            modelBuilder.Entity<PrestexaAPI.Models.CompanyBranding>()
                 .HasOne<Company>()
                 .WithMany()
                 .HasPrincipalKey(c => c.NmlsNumber)
                 .HasForeignKey(x => x.CompanyNmlsNumber)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            modelBuilder.Entity<CompanyBranding>()
+            modelBuilder.Entity<PrestexaAPI.Models.CompanyBranding>()
                 .HasOne(x => x.LightLogoAsset)
                 .WithMany()
                 .HasForeignKey(x => x.LightLogoAssetId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            modelBuilder.Entity<CompanyBranding>()
+            modelBuilder.Entity<PrestexaAPI.Models.CompanyBranding>()
                 .HasOne(x => x.DarkLogoAsset)
                 .WithMany()
                 .HasForeignKey(x => x.DarkLogoAssetId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            modelBuilder.Entity<CompanyBranding>()
+            modelBuilder.Entity<PrestexaAPI.Models.CompanyBranding>()
                 .HasOne(x => x.BackgroundAsset)
                 .WithMany()
                 .HasForeignKey(x => x.BackgroundAssetId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            modelBuilder.Entity<CompanyBranding>()
+            modelBuilder.Entity<PrestexaAPI.Models.CompanyBranding>()
                 .HasQueryFilter(b =>
                     _currentUser.IsSuperAdmin ||
                     (_currentUser.CompanyNmlsNumber != null &&

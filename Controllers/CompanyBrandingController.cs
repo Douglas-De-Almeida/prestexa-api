@@ -21,7 +21,6 @@ namespace PrestexaAPI.Controllers
         {
             var branding =
                 await _context.CompanyBrandings
-                .IgnoreQueryFilters()
                 .Include(x => x.LightLogoAsset)
                 .Include(x => x.DarkLogoAsset)
                 .Include(x => x.BackgroundAsset)
