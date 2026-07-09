@@ -21,8 +21,10 @@ namespace PrestexaAPI.Controllers
         private readonly IEmailSender _emailSender;
         private readonly IAuthTokenService _authTokenService;
         private readonly ITrustedDeviceService _trustedDeviceService;
+        private readonly ILogger<BorrowerAuthController> _logger;
 
         private const int OtpTokenMinutes = 10;
+        private const int PasswordResetTokenMinutes = 30;
         private const string BorrowerPortal = "borrower";
         private static readonly TimeSpan BorrowerRememberDuration = TimeSpan.FromDays(7);
 
@@ -31,13 +33,15 @@ namespace PrestexaAPI.Controllers
             IConfiguration config,
             IEmailSender emailSender,
             IAuthTokenService authTokenService,
-            ITrustedDeviceService trustedDeviceService)
+            ITrustedDeviceService trustedDeviceService,
+            ILogger<BorrowerAuthController> logger)
         {
             _context = context;
             _config = config;
             _emailSender = emailSender;
             _authTokenService = authTokenService;
             _trustedDeviceService = trustedDeviceService;
+            _logger = logger;
         }
 
         // ============================================================
@@ -249,17 +253,122 @@ namespace PrestexaAPI.Controllers
         }
 
         // ============================================================
-        // FORGOT PASSWORD PLACEHOLDER
+        // FORGOT PASSWORD
         // ============================================================
         [HttpPost("forgot-password")]
-        public IActionResult ForgotPassword([FromBody] PortalForgotPasswordRequest request)
+        public async Task<IActionResult> ForgotPassword([FromBody] PortalForgotPasswordRequest request)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
+            var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+
+            var user = await _context.Users
+                .Include(u => u.Company)
+                .FirstOrDefaultAsync(u => u.Email == normalizedEmail);
+
+            if (user == null ||
+                !IsBorrower(user) ||
+                user.Status != UserStatus.Active ||
+                (user.Company != null && !user.Company.IsActive))
+            {
+                return Ok(new
+                {
+                    message = "If an account exists with that email, password reset instructions have been sent."
+                });
+            }
+
+            try
+            {
+                var resetToken = CreatePasswordResetToken(user, "borrower_password_reset");
+
+                var resetBaseUrl =
+                    _config["BORROWER_PASSWORD_RESET_URL"] ??
+                    _config["Auth:BorrowerPasswordResetUrl"] ??
+                    "https://auth.prestexa.com/account/reset-password";
+
+                var separator = resetBaseUrl.Contains('?') ? "&" : "?";
+                var resetUrl = $"{resetBaseUrl}{separator}token={Uri.EscapeDataString(resetToken)}";
+
+                await _emailSender.SendEmailAsync(
+                    user.Email,
+                    "Reset your Prestexa borrower password",
+                    $"We received a request to reset your borrower password. Use this link within {PasswordResetTokenMinutes} minutes: {resetUrl}",
+                    $@"
+                        <div style=""font-family:Arial,sans-serif;color:#111827;line-height:1.5;"">
+                            <h2>Reset your borrower password</h2>
+                            <p>We received a request to reset your borrower password.</p>
+                            <p>This link expires in {PasswordResetTokenMinutes} minutes.</p>
+                            <p style=""margin:24px 0;"">
+                                <a href=""{resetUrl}"" style=""display:inline-block;background:#1d4ce9;color:#ffffff;padding:12px 18px;text-decoration:none;border-radius:6px;font-weight:600;"">Reset Password</a>
+                            </p>
+                            <p>If you did not request this, you can ignore this email.</p>
+                        </div>
+                    "
+                );
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send borrower password reset email for {Email}", normalizedEmail);
+
+                return StatusCode(500, new
+                {
+                    message = "Unable to send reset instructions."
+                });
+            }
+
             return Ok(new
             {
                 message = "If an account exists with that email, password reset instructions have been sent."
+            });
+        }
+
+        // ============================================================
+        // RESET PASSWORD
+        // ============================================================
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] PortalResetPasswordRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var principal = ValidatePasswordResetToken(
+                request.Token,
+                "borrower_password_reset"
+            );
+
+            if (principal == null)
+                return Unauthorized("Invalid or expired reset token.");
+
+            var userIdValue = principal.FindFirst("UserId")?.Value;
+
+            if (!int.TryParse(userIdValue, out var userId))
+                return Unauthorized("Invalid reset token.");
+
+            var user = await _context.Users
+                .Include(u => u.Company)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null)
+                return Unauthorized("User not found.");
+
+            if (!IsBorrower(user))
+                return Unauthorized("This account is not a borrower account.");
+
+            if (user.Status != UserStatus.Active)
+                return Unauthorized("User is not active.");
+
+            if (user.Company != null && !user.Company.IsActive)
+                return Unauthorized("Company is inactive.");
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Password has been reset successfully."
             });
         }
 
@@ -299,6 +408,70 @@ namespace PrestexaAPI.Controllers
             );
 
             return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        private string CreatePasswordResetToken(User user, string purpose)
+        {
+            var jwtKey = _config["Jwt:Key"];
+
+            if (string.IsNullOrWhiteSpace(jwtKey))
+                throw new Exception("JWT Key missing.");
+
+            var claims = new[]
+            {
+                new Claim("UserId", user.Id.ToString()),
+                new Claim("Email", user.Email),
+                new Claim("Purpose", purpose)
+            };
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+
+            var token = new JwtSecurityToken(
+                claims: claims,
+                expires: DateTime.UtcNow.AddMinutes(PasswordResetTokenMinutes),
+                signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256)
+            );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        private ClaimsPrincipal? ValidatePasswordResetToken(string token, string expectedPurpose)
+        {
+            try
+            {
+                var jwtKey = _config["Jwt:Key"];
+
+                if (string.IsNullOrWhiteSpace(jwtKey))
+                    throw new Exception("JWT Key missing.");
+
+                var tokenHandler = new JwtSecurityTokenHandler();
+                var key = Encoding.UTF8.GetBytes(jwtKey);
+
+                var principal = tokenHandler.ValidateToken(
+                    token,
+                    new TokenValidationParameters
+                    {
+                        ValidateIssuer = false,
+                        ValidateAudience = false,
+                        ValidateLifetime = true,
+                        ValidateIssuerSigningKey = true,
+                        ClockSkew = TimeSpan.Zero,
+                        IssuerSigningKey = new SymmetricSecurityKey(key)
+                    },
+                    out _
+                );
+
+                var purpose = principal.FindFirst("Purpose")?.Value;
+
+                if (!string.Equals(purpose, expectedPurpose, StringComparison.Ordinal))
+                    return null;
+
+                return principal;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private ClaimsPrincipal? ValidateOtpTemporaryToken(

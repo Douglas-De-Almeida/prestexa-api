@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using PrestexaAPI.Data.Configurations;
 using PrestexaAPI.Models;
 using PrestexaAPI.Services;
 
@@ -31,9 +32,27 @@ namespace PrestexaAPI.Data
         public DbSet<UserSession> UserSessions { get; set; }
         public DbSet<PrestexaAPI.Models.MediaAsset> MediaAssets => Set<PrestexaAPI.Models.MediaAsset>();
         public DbSet<PrestexaAPI.Models.CompanyBranding> CompanyBrandings => Set<PrestexaAPI.Models.CompanyBranding>();
+        public DbSet<LoanTerms> LoanTerms { get; set; }
+        public DbSet<SubjectProperty> SubjectProperties { get; set; }
+        public DbSet<BorrowerEmployment> BorrowerEmployments { get; set; }
+        public DbSet<BorrowerIncome> BorrowerIncomes { get; set; }
+        public DbSet<BorrowerAsset> BorrowerAssets { get; set; }
+        public DbSet<BorrowerLiability> BorrowerLiabilities { get; set; }
+        public DbSet<HousingExpense> HousingExpenses { get; set; }
+        public DbSet<BorrowerDeclaration> BorrowerDeclarations { get; set; }
+        public DbSet<GovernmentMonitoring> GovernmentMonitorings { get; set; }
+        public DbSet<LoanMilestone> LoanMilestones { get; set; }
+        public DbSet<LoanCondition> LoanConditions { get; set; }
+        public DbSet<LoanTask> LoanTasks { get; set; }
+        public DbSet<LoanOfficerAssignment> LoanOfficerAssignments { get; set; }
+        public DbSet<Realtor> Realtors { get; set; }
+        public DbSet<LoanRealtorAssignment> LoanRealtorAssignments { get; set; }
+        public DbSet<MismoImportRecord> MismoImportRecords { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
 
             // ✅ Company / Tenant
             modelBuilder.Entity<Company>()
@@ -288,6 +307,102 @@ namespace PrestexaAPI.Data
                     _currentUser.IsSuperAdmin ||
                     (_currentUser.CompanyNmlsNumber != null &&
                      b.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<LoanTerms>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<SubjectProperty>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<BorrowerEmployment>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<BorrowerIncome>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<BorrowerAsset>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<BorrowerLiability>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<HousingExpense>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<BorrowerDeclaration>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<GovernmentMonitoring>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<LoanMilestone>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<LoanCondition>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<LoanTask>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<LoanOfficerAssignment>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<Realtor>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<LoanRealtorAssignment>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<MismoImportRecord>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
         }
     }
 }

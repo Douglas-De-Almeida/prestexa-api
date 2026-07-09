@@ -6,6 +6,7 @@ namespace PrestexaAPI.Models
         Submitted,
         Approved,
         Denied,
-        Funded
+        Funded,
+        Archived
     }
 }

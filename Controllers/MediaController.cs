@@ -20,6 +20,7 @@ namespace PrestexaAPI.Controllers
         }
 
         [HttpGet("asset/{publicId:guid}")]
+        [HttpGet("/a/{publicId:guid}")]
         [ResponseCache(Duration = 31536000)]
         public async Task<IActionResult> GetAsset(Guid publicId)
         {
@@ -35,7 +36,11 @@ namespace PrestexaAPI.Controllers
                 _configuration["Storage:RootPath"];
 
             if (string.IsNullOrWhiteSpace(storageRoot))
-                return StatusCode(500);
+            {
+                storageRoot = Directory.Exists("/app/storage")
+                    ? "/app/storage"
+                    : Path.Combine(Directory.GetCurrentDirectory(), "storage");
+            }
 
             var physicalPath =
                 Path.Combine(storageRoot, asset.StoragePath);

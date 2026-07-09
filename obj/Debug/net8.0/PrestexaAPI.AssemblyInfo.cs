@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("PrestexaAPI")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+417b499d0e3ab9cabbe5ba37337c6a3c4e7fc644")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+07ea1481ee4df323c5a0d8bd7130dc15d7da16c7")]
 [assembly: System.Reflection.AssemblyProductAttribute("PrestexaAPI")]
 [assembly: System.Reflection.AssemblyTitleAttribute("PrestexaAPI")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

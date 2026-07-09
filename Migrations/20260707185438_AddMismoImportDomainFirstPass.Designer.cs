@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PrestexaAPI.Data;
@@ -11,9 +12,11 @@ using PrestexaAPI.Data;
 namespace PrestexaAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260707185438_AddMismoImportDomainFirstPass")]
+    partial class AddMismoImportDomainFirstPass
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1251,52 +1254,6 @@ namespace PrestexaAPI.Migrations
                     b.ToTable("MismoFiles");
                 });
 
-            modelBuilder.Entity("PrestexaAPI.Models.MismoImportRecord", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("CompanyNmlsNumber")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("ContentSha256")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<DateTime>("ImportedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("ImportedByUserId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("LoanId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("MismoVersion")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<int?>("SourceMismoFileId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("LoanId");
-
-                    b.HasIndex("CompanyNmlsNumber", "ContentSha256")
-                        .IsUnique();
-
-                    b.HasIndex("CompanyNmlsNumber", "LoanId");
-
-                    b.ToTable("MismoImportRecords");
-                });
-
             modelBuilder.Entity("PrestexaAPI.Models.Realtor", b =>
                 {
                     b.Property<int>("Id")
@@ -2117,26 +2074,6 @@ namespace PrestexaAPI.Migrations
                 });
 
             modelBuilder.Entity("PrestexaAPI.Models.MismoFile", b =>
-                {
-                    b.HasOne("PrestexaAPI.Models.Company", "Company")
-                        .WithMany()
-                        .HasForeignKey("CompanyNmlsNumber")
-                        .HasPrincipalKey("NmlsNumber")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("PrestexaAPI.Models.Loan", "Loan")
-                        .WithMany()
-                        .HasForeignKey("LoanId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Company");
-
-                    b.Navigation("Loan");
-                });
-
-            modelBuilder.Entity("PrestexaAPI.Models.MismoImportRecord", b =>
                 {
                     b.HasOne("PrestexaAPI.Models.Company", "Company")
                         .WithMany()

@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using PrestexaAPI.Data;
 using PrestexaAPI.Services;
+using PrestexaAPI.Services.Mismo;
 using System.Security.Claims;
 using System.Text;
 
@@ -55,6 +56,9 @@ builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<IEmailSender, SendGridEmailSender>();
+builder.Services.AddScoped<IMismoParserService, MismoParserService>();
+builder.Services.AddScoped<IMismoImportService, MismoImportService>();
+builder.Services.AddScoped<ManualMortgageApplicationService>();
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 

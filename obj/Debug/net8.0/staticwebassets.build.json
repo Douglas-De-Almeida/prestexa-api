@@ -1,11 +1,19 @@
 {
   "Version": 1,
-  "Hash": "qxSv5w+7bT4eHpgKGvTAsI9TeKWSWGkeG0sE74U9jj8=",
+  "Hash": "w/yy9DZQoidwbp/qLPq7DzCpiWzfzLW8DYs2kPCDiyo=",
   "Source": "PrestexaAPI",
   "BasePath": "_content/PrestexaAPI",
   "Mode": "Default",
   "ManifestType": "Build",
   "ReferencedProjectsConfiguration": [],
-  "DiscoveryPatterns": [],
+  "DiscoveryPatterns": [
+    {
+      "Name": "PrestexaAPI/wwwroot",
+      "Source": "PrestexaAPI",
+      "ContentRoot": "/volume1/Online Server/prestexa-los/api/wwwroot/",
+      "BasePath": "_content/PrestexaAPI",
+      "Pattern": "**"
+    }
+  ],
   "Assets": []
 }

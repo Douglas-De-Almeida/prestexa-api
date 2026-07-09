@@ -310,3 +310,5 @@
 /src/bin/Debug/net8.0/StarkbankEcdsa.dll
 /volume1/Online Server/prestexa-los/api/obj/Debug/net8.0/PrestexaAPI.sourcelink.json
 /src/obj/Debug/net8.0/PrestexaAPI.sourcelink.json
+/volume1/Online Server/prestexa-los/api/bin/Debug/net8.0/PrestexaAPI.staticwebassets.runtime.json
+/src/bin/Debug/net8.0/PrestexaAPI.staticwebassets.runtime.json

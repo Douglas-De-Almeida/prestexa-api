@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using PrestexaAPI.Data;
 using PrestexaAPI.Models;
 using PrestexaAPI.Models.Requests;
+using PrestexaAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -15,67 +16,29 @@ namespace PrestexaAPI.Controllers
     public class LoansController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly ManualMortgageApplicationService _manualMortgageApplicationService;
 
-        public LoansController(AppDbContext context)
+        public LoansController(
+            AppDbContext context,
+            ManualMortgageApplicationService manualMortgageApplicationService)
         {
             _context = context;
+            _manualMortgageApplicationService = manualMortgageApplicationService;
         }
 
-        [HttpPost]
-        public async Task<IActionResult> CreateLoan([FromBody] CreateLoanRequest request)
-        {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            if (!TryGetCurrentUser(out var userId, out var companyNmlsNumber, out var role))
-                return Unauthorized("Missing required token claims.");
-
-            if (string.IsNullOrWhiteSpace(companyNmlsNumber))
-                return Unauthorized("CompanyNmlsNumber claim is required.");
-
-            var loan = new Loan
-            {
-                LoanNumber = await GenerateLoanNumberAsync(),
-                CompanyNmlsNumber = companyNmlsNumber,
-                UserId = userId,
-
-                Subject_Street_Address = request.Subject_Street_Address,
-                Subject_City = request.Subject_City,
-                Subject_State = request.Subject_State,
-                Subject_ZipCode = request.Subject_ZipCode,
-
-                LoanAmount = request.LoanAmount,
-                Status = LoanStatus.Pending,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _context.Loans.Add(loan);
-            await _context.SaveChangesAsync();
-
-            return Ok(new
-            {
-                loan.LoanNumber,
-                loan.CompanyNmlsNumber,
-                loan.UserId,
-                loan.Subject_Street_Address,
-                loan.Subject_City,
-                loan.Subject_State,
-                loan.Subject_ZipCode,
-                loan.LoanAmount,
-                loan.Status,
-                loan.CreatedAt
-            });
-        }
-
-        [HttpGet]
-        public async Task<IActionResult> GetLoans()
+        [HttpGet("1003")]
+        public async Task<IActionResult> Get1003List([FromQuery] bool includeArchived = false)
         {
             if (!TryGetCurrentUser(out var userId, out var companyNmlsNumber, out var role))
                 return Unauthorized("Missing required token claims.");
 
             var query = BuildLoanAccessQuery(userId, companyNmlsNumber, role);
 
+            if (!includeArchived)
+                query = query.Where(l => l.Status != LoanStatus.Archived);
+
             var loans = await query
+                .OrderByDescending(l => l.CreatedAt)
                 .Select(l => new
                 {
                     l.LoanNumber,
@@ -87,6 +50,7 @@ namespace PrestexaAPI.Controllers
                     l.Subject_ZipCode,
                     l.LoanAmount,
                     l.Status,
+                    isArchived = l.Status == LoanStatus.Archived,
                     l.CreatedAt,
                     l.UpdatedAt
                 })
@@ -95,101 +59,103 @@ namespace PrestexaAPI.Controllers
             return Ok(loans);
         }
 
-        [HttpGet("{loanNumber}")]
-        public async Task<IActionResult> GetLoan(string loanNumber)
-        {
-            if (!TryGetCurrentUser(out var userId, out var companyNmlsNumber, out var role))
-                return Unauthorized("Missing required token claims.");
-
-            var query = BuildLoanAccessQuery(userId, companyNmlsNumber, role);
-
-            var loan = await query
-                .Where(l => l.LoanNumber == loanNumber)
-                .Select(l => new
-                {
-                    l.LoanNumber,
-                    l.CompanyNmlsNumber,
-                    l.UserId,
-                    l.Subject_Street_Address,
-                    l.Subject_City,
-                    l.Subject_State,
-                    l.Subject_ZipCode,
-                    l.LoanAmount,
-                    l.Status,
-                    l.CreatedAt,
-                    l.UpdatedAt
-                })
-                .FirstOrDefaultAsync();
-
-            if (loan == null)
-                return NotFound("Loan not found.");
-
-            return Ok(loan);
-        }
-
-        [HttpPut("{loanNumber}")]
-        public async Task<IActionResult> UpdateLoan(string loanNumber, [FromBody] UpdateLoanRequest request)
+        [HttpPost("1003")]
+        public async Task<IActionResult> Create1003(
+            [FromBody] ManualMortgageApplicationRequest request,
+            CancellationToken cancellationToken)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            if (!TryGetCurrentUser(out var userId, out var companyNmlsNumber, out var role))
+            if (!TryGetCurrentUser(out var userId, out var companyNmlsNumber, out _))
                 return Unauthorized("Missing required token claims.");
 
-            var query = BuildLoanAccessQuery(userId, companyNmlsNumber, role);
+            if (string.IsNullOrWhiteSpace(companyNmlsNumber))
+                return Unauthorized("CompanyNmlsNumber claim is required.");
 
-            var loan = await query.FirstOrDefaultAsync(l => l.LoanNumber == loanNumber);
+            var result = await _manualMortgageApplicationService.CreateAsync(
+                request,
+                userId,
+                companyNmlsNumber,
+                cancellationToken);
 
-            if (loan == null)
-                return NotFound("Loan not found.");
-
-            loan.Subject_Street_Address = request.Subject_Street_Address;
-            loan.Subject_City = request.Subject_City;
-            loan.Subject_State = request.Subject_State;
-            loan.Subject_ZipCode = request.Subject_ZipCode;
-            loan.LoanAmount = request.LoanAmount;
-            loan.UpdatedAt = DateTime.UtcNow;
-
-            if (!Enum.TryParse(request.Status, true, out LoanStatus status))
-                return BadRequest("Invalid loan status.");
-
-            loan.Status = status;
-
-            await _context.SaveChangesAsync();
-
-            return Ok(new
-            {
-                loan.LoanNumber,
-                loan.CompanyNmlsNumber,
-                loan.UserId,
-                loan.Subject_Street_Address,
-                loan.Subject_City,
-                loan.Subject_State,
-                loan.Subject_ZipCode,
-                loan.LoanAmount,
-                loan.Status,
-                loan.CreatedAt,
-                loan.UpdatedAt
-            });
+            return Ok(result);
         }
 
-        [HttpDelete("{loanNumber}")]
-        public async Task<IActionResult> DeleteLoan(string loanNumber)
+        [HttpGet("1003/{loanNumber}")]
+        public async Task<IActionResult> Get1003(string loanNumber, CancellationToken cancellationToken)
+        {
+            if (!TryGetCurrentUser(out _, out var companyNmlsNumber, out _))
+                return Unauthorized("Missing required token claims.");
+
+            if (string.IsNullOrWhiteSpace(companyNmlsNumber))
+                return Unauthorized("CompanyNmlsNumber claim is required.");
+
+            var result = await _manualMortgageApplicationService.GetAsync(
+                loanNumber,
+                companyNmlsNumber,
+                cancellationToken);
+
+            if (result == null)
+                return NotFound("Loan application not found.");
+
+            return Ok(result);
+        }
+
+        [HttpPut("1003/{loanNumber}")]
+        public async Task<IActionResult> Update1003(
+            string loanNumber,
+            [FromBody] ManualMortgageApplicationRequest request,
+            CancellationToken cancellationToken)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            if (!TryGetCurrentUser(out _, out var companyNmlsNumber, out _))
+                return Unauthorized("Missing required token claims.");
+
+            if (string.IsNullOrWhiteSpace(companyNmlsNumber))
+                return Unauthorized("CompanyNmlsNumber claim is required.");
+
+            var result = await _manualMortgageApplicationService.UpdateAsync(
+                loanNumber,
+                request,
+                companyNmlsNumber,
+                cancellationToken);
+
+            if (result == null)
+                return NotFound("Loan application not found.");
+
+            return Ok(result);
+        }
+
+        [HttpPatch("1003/{loanNumber}/archive")]
+        public async Task<IActionResult> SetArchiveState1003(
+            string loanNumber,
+            [FromQuery] bool archived = true,
+            [FromQuery] LoanStatus restoreStatus = LoanStatus.Pending,
+            CancellationToken cancellationToken = default)
         {
             if (!TryGetCurrentUser(out var userId, out var companyNmlsNumber, out var role))
                 return Unauthorized("Missing required token claims.");
 
             var query = BuildLoanAccessQuery(userId, companyNmlsNumber, role);
-
-            var loan = await query.FirstOrDefaultAsync(l => l.LoanNumber == loanNumber);
+            var loan = await query.FirstOrDefaultAsync(l => l.LoanNumber == loanNumber, cancellationToken);
 
             if (loan == null)
-                return NotFound("Loan not found.");
+                return NotFound("Loan application not found.");
 
-            _context.Loans.Remove(loan);
-            await _context.SaveChangesAsync();
+            loan.Status = archived ? LoanStatus.Archived : restoreStatus;
+            loan.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync(cancellationToken);
 
-            return Ok(new { message = "Loan deleted successfully." });
+            return Ok(new
+            {
+                loan.LoanNumber,
+                loan.Status,
+                isArchived = loan.Status == LoanStatus.Archived,
+                loan.UpdatedAt
+            });
         }
 
         private async Task<string> GenerateLoanNumberAsync()
