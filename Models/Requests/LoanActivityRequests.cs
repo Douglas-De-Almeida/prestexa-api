@@ -24,4 +24,10 @@ namespace PrestexaAPI.Models.Requests
 
         public bool NotifyLoanTeam { get; set; }
     }
+
+    public class UploadLoanActivityAttachmentRequest
+    {
+        [Required]
+        public IFormFile File { get; set; } = null!;
+    }
 }

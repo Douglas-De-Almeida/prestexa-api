@@ -241,11 +241,14 @@ namespace PrestexaAPI.Controllers
         }
 
         [HttpPost("{activityId:int}/attachments")]
+        [Consumes("multipart/form-data")]
         public async Task<IActionResult> UploadAttachment(
             string loanNumber,
             int activityId,
-            [FromForm] IFormFile file)
+            [FromForm] UploadLoanActivityAttachmentRequest request)
         {
+            var file = request.File;
+
             if (file == null || file.Length == 0)
                 return BadRequest("No file uploaded.");
 
