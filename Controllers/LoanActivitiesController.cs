@@ -354,6 +354,54 @@ namespace PrestexaAPI.Controllers
             return Ok(response);
         }
 
+        [HttpGet("attachments/{attachmentId:int}/download")]
+        public async Task<IActionResult> DownloadAttachment(
+            string loanNumber,
+            int attachmentId,
+            [FromQuery] bool thumbnail = false)
+        {
+            if (!TryGetCurrentUser(out var userId, out var companyNmlsNumber, out var role))
+                return Unauthorized("Missing required token claims.");
+
+            var loan = await BuildLoanAccessQuery(userId, companyNmlsNumber, role)
+                .FirstOrDefaultAsync(l => l.LoanNumber == loanNumber);
+
+            if (loan == null)
+                return NotFound("Loan not found.");
+
+            var attachment = await _context.LoanActivityAttachments
+                .AsNoTracking()
+                .FirstOrDefaultAsync(a => a.Id == attachmentId && a.LoanId == loan.Id);
+
+            if (attachment == null)
+                return NotFound("Attachment not found.");
+
+            var selectedRelativePath = thumbnail &&
+                                       !string.IsNullOrWhiteSpace(attachment.ThumbnailFilePath)
+                ? attachment.ThumbnailFilePath
+                : attachment.StoredFilePath;
+
+            if (string.IsNullOrWhiteSpace(selectedRelativePath))
+                return NotFound("Attachment path is missing.");
+
+            var fullPath = ResolveStoragePath(selectedRelativePath);
+
+            if (fullPath == null || !System.IO.File.Exists(fullPath))
+                return NotFound("Attachment file not found.");
+
+            var contentType = thumbnail &&
+                              !string.IsNullOrWhiteSpace(attachment.ThumbnailFilePath)
+                ? "image/jpeg"
+                : attachment.ContentType;
+
+            var downloadName = thumbnail
+                ? $"thumb-{attachment.OriginalFileName}"
+                : attachment.OriginalFileName;
+
+            var stream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            return File(stream, contentType, downloadName);
+        }
+
         private IQueryable<Loan> BuildLoanAccessQuery(int userId, string? companyNmlsNumber, string role)
         {
             var query = _context.Loans.AsQueryable();
@@ -416,6 +464,17 @@ namespace PrestexaAPI.Controllers
             var invalid = Path.GetInvalidFileNameChars();
             var filtered = value.Where(c => !invalid.Contains(c)).ToArray();
             return new string(filtered);
+        }
+
+        private static string? ResolveStoragePath(string relativePath)
+        {
+            var storageRoot = Path.GetFullPath("storage");
+            var candidatePath = Path.GetFullPath(Path.Combine("storage", relativePath));
+
+            if (!candidatePath.StartsWith(storageRoot, StringComparison.Ordinal))
+                return null;
+
+            return candidatePath;
         }
 
         private static HashSet<LoanActivityType> ParseActivityTypes(string? types)
