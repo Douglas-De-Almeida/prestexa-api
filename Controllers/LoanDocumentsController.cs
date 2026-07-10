@@ -170,6 +170,26 @@ namespace PrestexaAPI.Controllers
             _context.LoanDocuments.Add(documentEntity);
             await _context.SaveChangesAsync();
 
+            var activity = new LoanActivity
+            {
+                LoanId = loan.Id,
+                LoanNumber = loan.LoanNumber,
+                CompanyNmlsNumber = loan.CompanyNmlsNumber,
+                ActivityType = LoanActivityType.DocumentUpload,
+                Message = $"Document uploaded: {originalFileName}",
+                MetadataJson = $"{{\"category\":\"{documentEntity.Category}\",\"documentId\":{documentEntity.Id}}}",
+                NotifyLoanTeam = false,
+                Visibility = LoanActivityVisibility.InternalOnly,
+                ActorUserId = userId,
+                ActorName = User.FindFirst(ClaimTypes.Name)?.Value,
+                ActorRole = User.FindFirst(ClaimTypes.Role)?.Value,
+                ActorType = LoanActivityActorType.System,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+
+            _context.LoanActivities.Add(activity);
+            await _context.SaveChangesAsync();
+
             return Ok(new
             {
                 message = "File uploaded successfully.",
