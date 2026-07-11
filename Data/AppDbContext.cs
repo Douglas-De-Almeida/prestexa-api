@@ -50,6 +50,7 @@ namespace PrestexaAPI.Data
         public DbSet<MismoImportRecord> MismoImportRecords { get; set; }
         public DbSet<LoanActivity> LoanActivities { get; set; }
         public DbSet<LoanActivityAttachment> LoanActivityAttachments { get; set; }
+        public DbSet<CreditReport> CreditReports { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -413,6 +414,12 @@ namespace PrestexaAPI.Data
                      x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
 
             modelBuilder.Entity<LoanActivityAttachment>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<CreditReport>()
                 .HasQueryFilter(x =>
                     _currentUser.IsSuperAdmin ||
                     (_currentUser.CompanyNmlsNumber != null &&

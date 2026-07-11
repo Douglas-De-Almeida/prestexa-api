@@ -5,6 +5,8 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using PrestexaAPI.Data;
 using PrestexaAPI.Services;
+using PrestexaAPI.Services.Credit;
+using PrestexaAPI.Services.Credit.Providers;
 using PrestexaAPI.Services.Mismo;
 using System.Security.Claims;
 using System.Text;
@@ -59,6 +61,14 @@ builder.Services.AddScoped<IEmailSender, SendGridEmailSender>();
 builder.Services.AddScoped<IMismoParserService, MismoParserService>();
 builder.Services.AddScoped<IMismoImportService, MismoImportService>();
 builder.Services.AddScoped<ManualMortgageApplicationService>();
+builder.Services.AddScoped<ICreditService, CreditService>();
+builder.Services.AddScoped<ICreditRepository, CreditRepository>();
+builder.Services.AddScoped<ICreditProviderAdapterFactory, CreditProviderAdapterFactory>();
+builder.Services.AddScoped<ICreditProviderAdapter, XactusCreditProviderAdapter>();
+builder.Services.AddScoped<ICreditProviderAdapter, InformativeResearchCreditProviderAdapter>();
+builder.Services.AddScoped<ICreditProviderAdapter, CisCreditProviderAdapter>();
+builder.Services.AddScoped<ICreditProviderAdapter, AdvantageCreditProviderAdapter>();
+builder.Services.AddScoped<ICreditProviderAdapter, MeridianLinkCreditProviderAdapter>();
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
