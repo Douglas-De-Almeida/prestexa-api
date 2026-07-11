@@ -51,6 +51,8 @@ namespace PrestexaAPI.Data
         public DbSet<LoanActivity> LoanActivities { get; set; }
         public DbSet<LoanActivityAttachment> LoanActivityAttachments { get; set; }
         public DbSet<CreditReport> CreditReports { get; set; }
+        public DbSet<OrganizationAuditRecord> OrganizationAuditRecords { get; set; }
+        public DbSet<CompanyDomain> CompanyDomains { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -64,6 +66,18 @@ namespace PrestexaAPI.Data
 
             modelBuilder.Entity<Company>()
                 .HasAlternateKey(c => c.NmlsNumber);
+
+            modelBuilder.Entity<Company>()
+                .HasOne(c => c.PosLoanAppAssigneeUser)
+                .WithMany()
+                .HasForeignKey(c => c.PosLoanAppAssigneeUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Company>()
+                .HasOne<User>()
+                .WithMany()
+                .HasForeignKey(c => c.CreatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             // ✅ Users
             modelBuilder.Entity<User>()
@@ -424,6 +438,78 @@ namespace PrestexaAPI.Data
                     _currentUser.IsSuperAdmin ||
                     (_currentUser.CompanyNmlsNumber != null &&
                      x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<OrganizationAuditRecord>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+        }
+
+        public override int SaveChanges()
+        {
+            ApplyCompanyCreationMetadata();
+            EnforceImmutableCompanyNmls();
+            return base.SaveChanges();
+        }
+
+        public override int SaveChanges(bool acceptAllChangesOnSuccess)
+        {
+            ApplyCompanyCreationMetadata();
+            EnforceImmutableCompanyNmls();
+            return base.SaveChanges(acceptAllChangesOnSuccess);
+        }
+
+        public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            ApplyCompanyCreationMetadata();
+            EnforceImmutableCompanyNmls();
+            return base.SaveChangesAsync(cancellationToken);
+        }
+
+        public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+        {
+            ApplyCompanyCreationMetadata();
+            EnforceImmutableCompanyNmls();
+            return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+
+        private void ApplyCompanyCreationMetadata()
+        {
+            var addedCompanyEntries = ChangeTracker
+                .Entries<Company>()
+                .Where(entry => entry.State == EntityState.Added);
+
+            foreach (var entry in addedCompanyEntries)
+            {
+                if (entry.Entity.CreatedAt == default)
+                {
+                    entry.Entity.CreatedAt = DateTime.UtcNow;
+                }
+
+                if (!entry.Entity.CreatedByUserId.HasValue && _currentUser.UserId.HasValue)
+                {
+                    entry.Entity.CreatedByUserId = _currentUser.UserId.Value;
+                }
+            }
+        }
+
+        private void EnforceImmutableCompanyNmls()
+        {
+            var modifiedCompanyEntries = ChangeTracker
+                .Entries<Company>()
+                .Where(entry => entry.State == EntityState.Modified);
+
+            foreach (var entry in modifiedCompanyEntries)
+            {
+                var originalNmls = entry.Property(x => x.NmlsNumber).OriginalValue;
+                var currentNmls = entry.Property(x => x.NmlsNumber).CurrentValue;
+
+                if (!string.Equals(originalNmls, currentNmls, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Company NMLS ID cannot be modified after organization creation.");
+                }
+            }
         }
     }
 }

@@ -62,7 +62,7 @@ namespace PrestexaAPI.Controllers
                 return BadRequest("Invalid or inactive company.");
 
             var existingUser = await _context.Users
-                .FirstOrDefaultAsync(u => u.Email == normalizedEmail);
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
 
             if (existingUser != null)
                 return BadRequest("User already exists.");
@@ -109,11 +109,12 @@ namespace PrestexaAPI.Controllers
 
             var portal = NormalizePortal(request.Portal);
 
-            if (!IsAllowedPrestexaReturnUrl(
-                    request.ReturnUrl,
-                    portal,
-                    out var parsedUri,
-                    out var tenantSlug))
+            var returnUrlValidation = await ValidatePrestexaReturnUrlAsync(
+                request.ReturnUrl,
+                portal,
+                HttpContext.RequestAborted);
+
+            if (!returnUrlValidation.IsAllowed || returnUrlValidation.ParsedUri == null)
             {
                 return BadRequest("Invalid return URL.");
             }
@@ -123,10 +124,10 @@ namespace PrestexaAPI.Controllers
             var loginState = new LoginState
             {
                 StateId = stateId,
-                ReturnUrl = parsedUri.ToString(),
+                ReturnUrl = returnUrlValidation.ParsedUri.ToString(),
                 Portal = portal,
-                SourceHost = parsedUri.Host.ToLowerInvariant(),
-                TenantSlug = tenantSlug,
+                SourceHost = returnUrlValidation.ParsedUri.Host.ToLowerInvariant(),
+                TenantSlug = returnUrlValidation.TenantSlug,
                 CreatedAt = DateTime.UtcNow,
                 ExpiresAt = DateTime.UtcNow.AddMinutes(10),
                 IsUsed = false
@@ -216,11 +217,12 @@ namespace PrestexaAPI.Controllers
             if (!string.Equals(jwtPortal, loginState.Portal, StringComparison.OrdinalIgnoreCase))
                 return Forbid("Token portal does not match login state portal.");
 
-            if (!IsAllowedPrestexaReturnUrl(
-                    loginState.ReturnUrl,
-                    loginState.Portal,
-                    out var parsedUri,
-                    out _))
+            var returnUrlValidation = await ValidatePrestexaReturnUrlAsync(
+                loginState.ReturnUrl,
+                loginState.Portal,
+                HttpContext.RequestAborted);
+
+            if (!returnUrlValidation.IsAllowed || returnUrlValidation.ParsedUri == null)
             {
                 return BadRequest("Invalid return URL.");
             }
@@ -240,7 +242,7 @@ namespace PrestexaAPI.Controllers
             return Ok(new
             {
                 portal = loginState.Portal,
-                returnUrl = parsedUri.ToString()
+                returnUrl = returnUrlValidation.ParsedUri.ToString()
             });
         }
 
@@ -257,7 +259,7 @@ namespace PrestexaAPI.Controllers
 
             var user = await _context.Users
                 .Include(u => u.Company)
-                .FirstOrDefaultAsync(u => u.Email == normalizedEmail);
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
 
             if (user == null)
                 return Unauthorized("Invalid credentials.");
@@ -344,7 +346,7 @@ namespace PrestexaAPI.Controllers
 
             var user = await _context.Users
                 .Include(u => u.Company)
-                .FirstOrDefaultAsync(u => u.Email == normalizedEmail);
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
 
             if (user == null ||
                 !RequiresEmployeeAuthenticator(user) ||
@@ -603,29 +605,25 @@ namespace PrestexaAPI.Controllers
             };
         }
 
-        private static bool IsAllowedPrestexaReturnUrl(
+        private async Task<(bool IsAllowed, Uri? ParsedUri, string? TenantSlug)> ValidatePrestexaReturnUrlAsync(
             string returnUrl,
             string portal,
-            out Uri parsedUri,
-            out string? tenantSlug)
+            CancellationToken cancellationToken)
         {
-            parsedUri = null!;
-            tenantSlug = null;
-
             if (string.IsNullOrWhiteSpace(returnUrl))
-                return false;
+                return (false, null, null);
 
             if (!Uri.TryCreate(returnUrl, UriKind.Absolute, out var uri))
-                return false;
+                return (false, null, null);
 
             if (!string.Equals(uri.Scheme, "https", StringComparison.OrdinalIgnoreCase))
-                return false;
+                return (false, null, null);
 
             var host = uri.Host.ToLowerInvariant();
             var path = uri.AbsolutePath.ToLowerInvariant();
 
             if (!host.EndsWith(".prestexa.com", StringComparison.OrdinalIgnoreCase))
-                return false;
+                return (false, null, null);
 
             var reservedHosts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -636,46 +634,62 @@ namespace PrestexaAPI.Controllers
             };
 
             if (reservedHosts.Contains(host))
-                return false;
+                return (false, null, null);
 
             if (host == "los.prestexa.com")
             {
                 if (portal == "borrower" && !path.StartsWith("/account"))
-                    return false;
+                    return (false, null, null);
 
                 if (portal == "rea" && !path.StartsWith("/crm"))
-                    return false;
+                    return (false, null, null);
 
                 if (portal == "los" &&
                     (path.StartsWith("/account") || path.StartsWith("/crm")))
-                    return false;
+                    return (false, null, null);
 
-                parsedUri = uri;
-                return true;
+                return (true, uri, null);
             }
 
             var slug = host.Replace(".prestexa.com", "");
 
             if (string.IsNullOrWhiteSpace(slug))
-                return false;
+                return (false, null, null);
 
             if (!IsSafeTenantSlug(slug))
-                return false;
+                return (false, null, null);
+
+            if (DomainValidationRules.IsReservedSubdomain(slug))
+                return (false, null, null);
 
             if (portal == "borrower" && !path.StartsWith("/account"))
-                return false;
+                return (false, null, null);
 
             if (portal == "rea" && !path.StartsWith("/crm"))
-                return false;
+                return (false, null, null);
 
             if (portal == "los" &&
                 (path.StartsWith("/account") || path.StartsWith("/crm")))
-                return false;
+                return (false, null, null);
 
-            tenantSlug = slug;
-            parsedUri = uri;
+            var canonicalDomain = await _context.CompanyDomains
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(x => x.Subdomain == slug)
+                .OrderByDescending(x => x.IsActive)
+                .ThenByDescending(x => x.IsVerified)
+                .FirstOrDefaultAsync(cancellationToken);
 
-            return true;
+            if (canonicalDomain != null)
+            {
+                if (!canonicalDomain.IsActive || !canonicalDomain.IsVerified)
+                    return (false, null, null);
+
+                return (true, uri, canonicalDomain.Subdomain);
+            }
+
+            // Legacy compatibility path while canonical domains are backfilled.
+            return (true, uri, slug);
         }
 
         private static bool IsSafeTenantSlug(string slug)

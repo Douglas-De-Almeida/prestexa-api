@@ -16,6 +16,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddScoped<ITrustedDeviceService, TrustedDeviceService>();
 
 builder.Services.AddScoped<IAuthTokenService, AuthTokenService>();
+builder.Services.AddScoped<IOrganizationSettingsService, OrganizationSettingsService>();
+builder.Services.AddScoped<IDomainSettingsService, DomainSettingsService>();
 
 builder.WebHost.ConfigureKestrel(serverOptions =>
 {
