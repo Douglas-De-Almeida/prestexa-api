@@ -30,6 +30,7 @@ namespace PrestexaAPI.Data
         public DbSet<LoginState> LoginStates { get; set; }
         public DbSet<TrustedMfaDevice> TrustedMfaDevices { get; set; }
         public DbSet<UserSession> UserSessions { get; set; }
+        public DbSet<UserRole> UserRoles { get; set; }
         public DbSet<PrestexaAPI.Models.MediaAsset> MediaAssets => Set<PrestexaAPI.Models.MediaAsset>();
         public DbSet<PrestexaAPI.Models.CompanyBranding> CompanyBrandings => Set<PrestexaAPI.Models.CompanyBranding>();
         public DbSet<LoanTerms> LoanTerms { get; set; }
@@ -53,6 +54,39 @@ namespace PrestexaAPI.Data
         public DbSet<CreditReport> CreditReports { get; set; }
         public DbSet<OrganizationAuditRecord> OrganizationAuditRecords { get; set; }
         public DbSet<CompanyDomain> CompanyDomains { get; set; }
+        public DbSet<OperationalAsset> OperationalAssets { get; set; }
+        public DbSet<OperationalAssetAuditRecord> OperationalAssetAuditRecords { get; set; }
+        public DbSet<ExportPackageJob> ExportPackageJobs { get; set; }
+        public DbSet<Contact> Contacts { get; set; }
+        public DbSet<LoanContact> LoanContacts { get; set; }
+        public DbSet<ContactSyncConnection> ContactSyncConnections { get; set; }
+        public DbSet<ESignEnvelope> ESignEnvelopes { get; set; }
+        public DbSet<ESignRecipient> ESignRecipients { get; set; }
+        public DbSet<ESignDocument> ESignDocuments { get; set; }
+        public DbSet<ESignField> ESignFields { get; set; }
+        public DbSet<ESignEvent> ESignEvents { get; set; }
+        public DbSet<ESignCertificate> ESignCertificates { get; set; }
+        public DbSet<ESignSigningSession> ESignSigningSessions { get; set; }
+        public DbSet<AUSRun> AUSRuns { get; set; }
+        public DbSet<AUSProviderRun> AUSProviderRuns { get; set; }
+        public DbSet<AUSFinding> AUSFindings { get; set; }
+        public DbSet<AUSProviderCredential> AUSProviderCredentials { get; set; }
+        public DbSet<AUSRunEvent> AUSRunEvents { get; set; }
+        public DbSet<LoanMilestoneHistory> LoanMilestoneHistories { get; set; }
+        public DbSet<AutomatedEmailTemplate> AutomatedEmailTemplates { get; set; }
+        public DbSet<AutomatedEmailRule> AutomatedEmailRules { get; set; }
+        public DbSet<LoanAutomationSettings> LoanAutomationSettings { get; set; }
+        public DbSet<EmailDeliveryRecord> EmailDeliveryRecords { get; set; }
+        public DbSet<LoanReminderSchedule> LoanReminderSchedules { get; set; }
+        public DbSet<LoanReminderRun> LoanReminderRuns { get; set; }
+        public DbSet<MessageProviderConfig> MessageProviderConfigs { get; set; }
+        public DbSet<DocumentFolder> DocumentFolders { get; set; }
+        public DbSet<FormDefinition> FormDefinitions { get; set; }
+        public DbSet<FormSet> FormSets { get; set; }
+        public DbSet<FormSetItem> FormSetItems { get; set; }
+        public DbSet<ClientNeedsRule> ClientNeedsRules { get; set; }
+        public DbSet<AutomationRule> AutomationRules { get; set; }
+        public DbSet<ClosingCostItem> ClosingCostItems { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -90,6 +124,18 @@ namespace PrestexaAPI.Data
                 .HasPrincipalKey(c => c.NmlsNumber)
                 .HasForeignKey(u => u.CompanyNmlsNumber)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<User>()
+                .HasOne(u => u.ProfilePhotoAsset)
+                .WithMany()
+                .HasForeignKey(u => u.ProfilePhotoAssetId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<UserRole>()
+                .HasQueryFilter(ur =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     ur.User.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
 
             // ✅ Loans
             modelBuilder.Entity<Loan>()
@@ -444,6 +490,139 @@ namespace PrestexaAPI.Data
                     _currentUser.IsSuperAdmin ||
                     (_currentUser.CompanyNmlsNumber != null &&
                      x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<OperationalAsset>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<OperationalAssetAuditRecord>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<ExportPackageJob>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<Contact>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<LoanContact>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<ESignEnvelope>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<ESignRecipient>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.Envelope.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<ESignDocument>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.Envelope.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<ESignField>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.Recipient.Envelope.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<ESignEvent>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.Envelope.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<ESignCertificate>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.Envelope.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<AUSRun>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<AUSProviderRun>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.AUSRun.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<AUSFinding>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.AUSProviderRun.AUSRun.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<AUSProviderCredential>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<AUSRunEvent>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.AUSRun.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<LoanMilestoneHistory>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<AutomatedEmailTemplate>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<AutomatedEmailRule>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<LoanAutomationSettings>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<EmailDeliveryRecord>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
+            modelBuilder.Entity<LoanReminderSchedule>()
+                .HasQueryFilter(x =>
+                    _currentUser.IsSuperAdmin ||
+                    (_currentUser.CompanyNmlsNumber != null &&
+                     x.CompanyNmlsNumber == _currentUser.CompanyNmlsNumber));
+
         }
 
         public override int SaveChanges()
