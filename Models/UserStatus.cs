@@ -4,6 +4,8 @@ namespace PrestexaAPI.Models
     {
         Active,
         Inactive,
-        Suspended
+        Suspended,
+        PasswordResetPending,
+        InvitePending
     }
 }

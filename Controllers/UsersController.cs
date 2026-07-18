@@ -1,11 +1,14 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using PrestexaAPI.Data;
 using PrestexaAPI.Models;
 using PrestexaAPI.Models.Requests;
 using PrestexaAPI.Services;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Text;
 using System.Text.Json;
 
 namespace PrestexaAPI.Controllers
@@ -16,6 +19,7 @@ namespace PrestexaAPI.Controllers
     public class UsersController : ControllerBase
     {
         private const long MaxProfilePhotoSizeBytes = 5 * 1024 * 1024;
+        private const int PasswordResetTokenMinutes = 30;
 
         private static readonly HashSet<string> AllowedProfilePhotoContentTypes =
             new(StringComparer.OrdinalIgnoreCase)
@@ -37,17 +41,20 @@ namespace PrestexaAPI.Controllers
         private readonly AppDbContext _context;
         private readonly ICurrentUserService _currentUserService;
         private readonly IConfiguration _configuration;
+        private readonly IEmailSender _emailSender;
         private readonly ILogger<UsersController> _logger;
 
         public UsersController(
             AppDbContext context,
             ICurrentUserService currentUserService,
             IConfiguration configuration,
+            IEmailSender emailSender,
             ILogger<UsersController> logger)
         {
             _context = context;
             _currentUserService = currentUserService;
             _configuration = configuration;
+            _emailSender = emailSender;
             _logger = logger;
         }
 
@@ -112,7 +119,7 @@ namespace PrestexaAPI.Controllers
             return await SaveProfilePhotoAsync(
                 user,
                 file,
-                "Profile Photo Uploaded");
+                "UserProfilePhotoUpdated");
         }
 
         [HttpDelete("me/photo")]
@@ -128,7 +135,7 @@ namespace PrestexaAPI.Controllers
 
             return await RemoveProfilePhotoAsync(
                 user,
-                "Profile Photo Removed");
+                "UserProfilePhotoRemoved");
         }
 
         [HttpGet("me/photo")]
@@ -163,7 +170,7 @@ namespace PrestexaAPI.Controllers
             return await SaveProfilePhotoAsync(
                 user,
                 file,
-                "Admin Updated User Profile Photo",
+                "UserProfilePhotoUpdated",
                 userId);
         }
 
@@ -183,7 +190,7 @@ namespace PrestexaAPI.Controllers
 
             return await RemoveProfilePhotoAsync(
                 user,
-                "Admin Removed User Profile Photo",
+                "UserProfilePhotoRemoved",
                 userId);
         }
 
@@ -368,6 +375,20 @@ namespace PrestexaAPI.Controllers
             await _context.SaveChangesAsync();
 
             await SyncUserRolesAsync(user, primaryRole, roleNames, request.RoleChangeReason);
+
+            await AddUserLifecycleAuditEventAsync(
+                user,
+                "UserCreated",
+                "User",
+                new
+                {
+                    targetUserId = user.Id,
+                    user.Email,
+                    user.Status,
+                    primaryRole,
+                    roles = roleNames
+                });
+
             await _context.SaveChangesAsync();
 
             return await GetUser(user.Id);
@@ -400,6 +421,11 @@ namespace PrestexaAPI.Controllers
 
             var currentRole = user.Role;
             var roleChanged = !string.Equals(currentRole, primaryRole, StringComparison.Ordinal);
+            var previousStatus = user.Status;
+            var oldEmail = user.Email;
+            var oldFirstName = user.FirstName;
+            var oldLastName = user.LastName;
+            var oldProfilePhotoAssetId = user.ProfilePhotoAssetId;
 
             user.FirstName = request.FirstName.Trim();
             user.MiddleName = string.IsNullOrWhiteSpace(request.MiddleName)
@@ -407,7 +433,10 @@ namespace PrestexaAPI.Controllers
                 : request.MiddleName.Trim();
             user.LastName = request.LastName.Trim();
             user.Email = normalizedEmail;
-            user.PhoneNumber = request.PhoneNumber.Trim();
+            if (!string.IsNullOrWhiteSpace(request.PhoneNumber))
+            {
+                user.PhoneNumber = request.PhoneNumber.Trim();
+            }
             user.Role = primaryRole;
             user.UserNmlsNumber = string.IsNullOrWhiteSpace(request.UserNmlsNumber)
                 ? null
@@ -432,6 +461,34 @@ namespace PrestexaAPI.Controllers
                 user.Status = parsedStatus;
             }
             user.UpdatedAt = DateTime.UtcNow;
+
+            var profilePhotoResolution = await ResolveRequestedProfilePhotoAssetAsync(request, user.CompanyNmlsNumber);
+            if (!profilePhotoResolution.IsValid)
+                return BadRequest(profilePhotoResolution.ErrorMessage);
+
+            if (profilePhotoResolution.HasRequestedChange)
+            {
+                user.ProfilePhotoAssetId = profilePhotoResolution.NewAssetId;
+                user.ProfilePhotoPath = null;
+
+                if (oldProfilePhotoAssetId != profilePhotoResolution.NewAssetId)
+                {
+                    await AddProfilePhotoAuditRecordAsync(
+                        profilePhotoResolution.NewAssetId.HasValue ? "UserProfilePhotoUpdated" : "UserProfilePhotoRemoved",
+                        user,
+                        oldProfilePhotoAssetId,
+                        profilePhotoResolution.NewAssetId);
+
+                    if (oldProfilePhotoAssetId.HasValue)
+                    {
+                        var oldAsset = await _context.MediaAssets
+                            .FirstOrDefaultAsync(x => x.Id == oldProfilePhotoAssetId.Value);
+
+                        if (oldAsset != null && oldAsset.IsActive)
+                            oldAsset.IsActive = false;
+                    }
+                }
+            }
 
             if (!string.IsNullOrWhiteSpace(request.Password))
             {
@@ -460,6 +517,38 @@ namespace PrestexaAPI.Controllers
 
             await SyncUserRolesAsync(user, primaryRole, roleNames, request.RoleChangeReason);
 
+            await AddUserLifecycleAuditEventAsync(
+                user,
+                "UserUpdated",
+                "User",
+                new
+                {
+                    targetUserId = user.Id,
+                    oldEmail,
+                    newEmail = user.Email,
+                    oldName = string.Join(" ", new[] { oldFirstName, oldLastName }.Where(x => !string.IsNullOrWhiteSpace(x))),
+                    newName = string.Join(" ", new[] { user.FirstName, user.LastName }.Where(x => !string.IsNullOrWhiteSpace(x))),
+                    oldStatus = previousStatus.ToString(),
+                    newStatus = user.Status.ToString(),
+                    oldPrimaryRole = currentRole,
+                    newPrimaryRole = primaryRole
+                });
+
+            if (previousStatus != user.Status)
+            {
+                var statusEvent = user.Status == UserStatus.Active ? "UserActivated" : "UserDeactivated";
+                await AddUserLifecycleAuditEventAsync(
+                    user,
+                    statusEvent,
+                    "Status",
+                    new
+                    {
+                        targetUserId = user.Id,
+                        oldStatus = previousStatus.ToString(),
+                        newStatus = user.Status.ToString()
+                    });
+            }
+
             await _context.SaveChangesAsync();
 
             return await GetUser(user.Id);
@@ -468,23 +557,353 @@ namespace PrestexaAPI.Controllers
         [HttpDelete("{userId}")]
         public async Task<IActionResult> DeleteUser(int userId)
         {
+            if (_currentUserService.UserId.HasValue && _currentUserService.UserId.Value == userId)
+                return BadRequest("You cannot delete your own account.");
+
             var user = await BuildAccessibleUsersQuery()
+                .Include(u => u.ProfilePhotoAsset)
                 .FirstOrDefaultAsync(u => u.Id == userId);
 
             if (user == null)
                 return NotFound("User not found.");
 
-            user.Status = UserStatus.Inactive;
-            user.UpdatedAt = DateTime.UtcNow;
+            if (user.Status != UserStatus.Inactive)
+                return BadRequest("Deactivate the user before deleting the account.");
+
+            var hasLoanOwnership = await _context.Loans.AnyAsync(x => x.UserId == user.Id);
+            var hasLoanOfficerAssignments = await _context.LoanOfficerAssignments.AnyAsync(x => x.UserId == user.Id);
+            var hasExportPackageHistory = await _context.ExportPackageJobs.AnyAsync(x => x.RequestedByUserId == user.Id);
+            var hasCreditReportHistory = await _context.CreditReports.AnyAsync(x => x.OrderedByUserId == user.Id);
+
+            if (hasLoanOwnership || hasLoanOfficerAssignments || hasExportPackageHistory || hasCreditReportHistory)
+            {
+                return Conflict(new
+                {
+                    error = "User cannot be deleted because historical records are attached.",
+                    dependencies = new
+                    {
+                        loanOwnership = hasLoanOwnership,
+                        loanOfficerAssignments = hasLoanOfficerAssignments,
+                        exportPackageHistory = hasExportPackageHistory,
+                        creditReportHistory = hasCreditReportHistory
+                    }
+                });
+            }
+
+            await AddUserLifecycleAuditEventAsync(
+                user,
+                "UserDeleted",
+                "User",
+                new
+                {
+                    targetUserId = user.Id,
+                    user.Email,
+                    deletedAtUtc = DateTime.UtcNow
+                });
+
+            if (user.ProfilePhotoAsset != null && user.ProfilePhotoAsset.IsActive)
+                user.ProfilePhotoAsset.IsActive = false;
+
+            _context.Users.Remove(user);
 
             await _context.SaveChangesAsync();
 
             return Ok(new
             {
-                message = "User disabled successfully.",
-                user.Id,
+                message = "User deleted successfully.",
+                userId = user.Id,
+                deleted = true
+            });
+        }
+
+        [HttpPost("{userId}/reset-password")]
+        [HttpPost("{userId}/reset")]
+        public async Task<IActionResult> SendUserResetPasswordEmail(int userId)
+        {
+            if (!IsUserRoleHistoryAdminRole(GetCurrentRole()))
+                return Forbid();
+
+            var user = await BuildAccessibleUsersQuery()
+                .Include(u => u.Company)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null)
+                return NotFound("User not found.");
+
+            if (!IsEmployeeManagedAccount(user))
+                return BadRequest("Password reset can only be sent for employee LOS users.");
+
+            if (user.Status == UserStatus.Inactive || user.Status == UserStatus.Suspended)
+                return BadRequest("Password reset cannot be sent to inactive or suspended users.");
+
+            var resetToken = CreateUserActionToken(user, "password_reset");
+            var resetBaseUrl =
+                _configuration["AUTH_PASSWORD_RESET_URL"] ??
+                _configuration["Auth:PasswordResetUrl"] ??
+                "https://auth.prestexa.com/reset-password";
+            var separator = resetBaseUrl.Contains('?') ? "&" : "?";
+            var resetUrl = $"{resetBaseUrl}{separator}token={Uri.EscapeDataString(resetToken)}";
+
+            await _emailSender.SendEmailAsync(
                 user.Email,
-                user.Status
+                "Reset your Prestexa password",
+                $"Your administrator requested a password reset. Use this link within {PasswordResetTokenMinutes} minutes: {resetUrl}",
+                $@"
+                    <div style=""font-family:Arial,sans-serif;color:#111827;line-height:1.5;"">
+                        <h2>Reset your Prestexa password</h2>
+                        <p>Your administrator requested a password reset for your account.</p>
+                        <p>This link expires in {PasswordResetTokenMinutes} minutes.</p>
+                        <p style=""margin:24px 0;""><a href=""{resetUrl}"" style=""display:inline-block;background:#1d4ce9;color:#ffffff;padding:12px 18px;text-decoration:none;border-radius:6px;font-weight:600;"">Reset Password</a></p>
+                    </div>
+                ");
+
+            var previousStatus = user.Status;
+            user.Status = UserStatus.PasswordResetPending;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await AddUserLifecycleAuditEventAsync(
+                user,
+                "UserPasswordResetPending",
+                "Status",
+                new
+                {
+                    targetUserId = user.Id,
+                    oldStatus = previousStatus.ToString(),
+                    newStatus = user.Status.ToString()
+                });
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Password reset instructions have been sent.",
+                userId = user.Id,
+                status = ToStatusLabel(user.Status)
+            });
+        }
+
+        [HttpPost("{userId}/send-invite")]
+        [HttpPost("{userId}/invite")]
+        public async Task<IActionResult> SendUserInviteEmail(int userId)
+        {
+            if (!IsUserRoleHistoryAdminRole(GetCurrentRole()))
+                return Forbid();
+
+            var user = await BuildAccessibleUsersQuery()
+                .Include(u => u.Company)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null)
+                return NotFound("User not found.");
+
+            if (!IsEmployeeManagedAccount(user))
+                return BadRequest("Invites can only be sent for employee LOS users.");
+
+            if (user.Status == UserStatus.Inactive || user.Status == UserStatus.Suspended)
+                return BadRequest("Invites cannot be sent to inactive or suspended users.");
+
+            var inviteToken = CreateUserActionToken(user, "invite_password_set");
+            var resetBaseUrl =
+                _configuration["AUTH_PASSWORD_RESET_URL"] ??
+                _configuration["Auth:PasswordResetUrl"] ??
+                "https://auth.prestexa.com/reset-password";
+            var separator = resetBaseUrl.Contains('?') ? "&" : "?";
+            var inviteUrl = $"{resetBaseUrl}{separator}token={Uri.EscapeDataString(inviteToken)}";
+
+            await _emailSender.SendEmailAsync(
+                user.Email,
+                "You're invited to Prestexa",
+                $"You have been invited to access Prestexa. Set your password using this link within {PasswordResetTokenMinutes} minutes: {inviteUrl}",
+                $@"
+                    <div style=""font-family:Arial,sans-serif;color:#111827;line-height:1.5;"">
+                        <h2>You're invited to Prestexa</h2>
+                        <p>You have been invited to access your LOS account.</p>
+                        <p>This link expires in {PasswordResetTokenMinutes} minutes.</p>
+                        <p style=""margin:24px 0;""><a href=""{inviteUrl}"" style=""display:inline-block;background:#1d4ce9;color:#ffffff;padding:12px 18px;text-decoration:none;border-radius:6px;font-weight:600;"">Set Password</a></p>
+                    </div>
+                ");
+
+            var previousStatus = user.Status;
+            user.Status = UserStatus.InvitePending;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await AddUserLifecycleAuditEventAsync(
+                user,
+                "UserInvitePending",
+                "Status",
+                new
+                {
+                    targetUserId = user.Id,
+                    oldStatus = previousStatus.ToString(),
+                    newStatus = user.Status.ToString()
+                });
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Invite email has been sent.",
+                userId = user.Id,
+                status = ToStatusLabel(user.Status)
+            });
+        }
+
+        [HttpPost("{userId}/transfer-files")]
+        public Task<IActionResult> TransferFilesAndDeleteUser(int userId, [FromBody] TransferUserFilesRequest request)
+        {
+            return TransferAndDeleteUserInternal(userId, request);
+        }
+
+        [HttpPost("{userId}/transfer")]
+        public Task<IActionResult> TransferAndDeleteUser(int userId, [FromBody] TransferUserFilesRequest request)
+        {
+            return TransferAndDeleteUserInternal(userId, request);
+        }
+
+        private async Task<IActionResult> TransferAndDeleteUserInternal(int userId, TransferUserFilesRequest request)
+        {
+            if (request.TargetUserId <= 0)
+                return BadRequest("targetUserId is required.");
+
+            if (_currentUserService.UserId.HasValue && _currentUserService.UserId.Value == userId)
+                return BadRequest("You cannot delete your own account.");
+
+            var sourceUser = await BuildAccessibleUsersQuery()
+                .Include(u => u.ProfilePhotoAsset)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (sourceUser == null)
+                return NotFound("User not found.");
+
+            if (sourceUser.Status != UserStatus.Inactive)
+                return BadRequest("Deactivate the user before deleting the account.");
+
+            if (sourceUser.Id == request.TargetUserId)
+                return BadRequest("targetUserId cannot be the same as the user being deleted.");
+
+            var targetUser = await BuildAccessibleUsersQuery()
+                .FirstOrDefaultAsync(u => u.Id == request.TargetUserId);
+
+            if (targetUser == null)
+                return BadRequest("Target user was not found in this organization.");
+
+            if (targetUser.Status != UserStatus.Active)
+                return BadRequest("Target user must be active.");
+
+            var now = DateTime.UtcNow;
+            var transferredLoanOwnershipCount = 0;
+            var transferredAssignmentCount = 0;
+            var transferredExportPackageCount = 0;
+            var transferredCreditReportCount = 0;
+
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+
+            var ownedLoans = await _context.Loans
+                .Where(x => x.UserId == sourceUser.Id)
+                .ToListAsync();
+
+            transferredLoanOwnershipCount = ownedLoans.Count;
+            foreach (var loan in ownedLoans)
+            {
+                loan.UserId = targetUser.Id;
+                loan.UpdatedAt = now;
+            }
+
+            var sourceAssignments = await _context.LoanOfficerAssignments
+                .Where(x => x.UserId == sourceUser.Id)
+                .ToListAsync();
+
+            var targetLoanIds = await _context.LoanOfficerAssignments
+                .Where(x => x.UserId == targetUser.Id)
+                .Select(x => x.LoanId)
+                .ToListAsync();
+
+            var targetLoanIdSet = targetLoanIds.ToHashSet();
+            foreach (var assignment in sourceAssignments)
+            {
+                if (targetLoanIdSet.Contains(assignment.LoanId))
+                {
+                    _context.LoanOfficerAssignments.Remove(assignment);
+                    continue;
+                }
+
+                assignment.UserId = targetUser.Id;
+                targetLoanIdSet.Add(assignment.LoanId);
+                transferredAssignmentCount++;
+            }
+
+            var exportJobs = await _context.ExportPackageJobs
+                .Where(x => x.RequestedByUserId == sourceUser.Id)
+                .ToListAsync();
+
+            transferredExportPackageCount = exportJobs.Count;
+            foreach (var job in exportJobs)
+                job.RequestedByUserId = targetUser.Id;
+
+            var creditReports = await _context.CreditReports
+                .Where(x => x.OrderedByUserId == sourceUser.Id)
+                .ToListAsync();
+
+            transferredCreditReportCount = creditReports.Count;
+            foreach (var report in creditReports)
+                report.OrderedByUserId = targetUser.Id;
+
+            await AddUserLifecycleAuditEventAsync(
+                sourceUser,
+                "UserTransferredAndDeleted",
+                "User",
+                new
+                {
+                    targetUserId = sourceUser.Id,
+                    transferToUserId = targetUser.Id,
+                    sourceUser.Email,
+                    targetUserEmail = targetUser.Email,
+                    transferredLoanOwnershipCount,
+                    transferredAssignmentCount,
+                    transferredExportPackageCount,
+                    transferredCreditReportCount,
+                    deletedAtUtc = now
+                });
+
+            if (sourceUser.ProfilePhotoAsset != null && sourceUser.ProfilePhotoAsset.IsActive)
+                sourceUser.ProfilePhotoAsset.IsActive = false;
+
+            _context.Users.Remove(sourceUser);
+
+            try
+            {
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+            }
+            catch (DbUpdateException)
+            {
+                await transaction.RollbackAsync();
+                return Conflict(new
+                {
+                    error = "User could not be deleted after transfer due to remaining dependencies.",
+                    dependencies = new
+                    {
+                        loanOwnership = await _context.Loans.AnyAsync(x => x.UserId == sourceUser.Id),
+                        loanOfficerAssignments = await _context.LoanOfficerAssignments.AnyAsync(x => x.UserId == sourceUser.Id),
+                        exportPackageHistory = await _context.ExportPackageJobs.AnyAsync(x => x.RequestedByUserId == sourceUser.Id),
+                        creditReportHistory = await _context.CreditReports.AnyAsync(x => x.OrderedByUserId == sourceUser.Id)
+                    }
+                });
+            }
+
+            return Ok(new
+            {
+                message = "Files transferred and user deleted successfully.",
+                userId = sourceUser.Id,
+                targetUserId = targetUser.Id,
+                transferred = new
+                {
+                    loanOwnership = transferredLoanOwnershipCount,
+                    loanOfficerAssignments = transferredAssignmentCount,
+                    exportPackageHistory = transferredExportPackageCount,
+                    creditReportHistory = transferredCreditReportCount
+                },
+                deleted = true
             });
         }
 
@@ -590,6 +1009,19 @@ namespace PrestexaAPI.Controllers
 
             await _context.SaveChangesAsync();
 
+            await AddUserLifecycleAuditEventAsync(
+                user,
+                "BranchAssignmentUpdated",
+                "Branches",
+                new
+                {
+                    targetUserId = user.Id,
+                    branchIds,
+                    defaultBranchId
+                });
+
+            await _context.SaveChangesAsync();
+
             return await GetUserBranches(userId);
         }
 
@@ -651,7 +1083,62 @@ namespace PrestexaAPI.Controllers
                 return true;
             }
 
+            if (string.Equals(value.Trim(), "Password Reset Pending", StringComparison.OrdinalIgnoreCase))
+            {
+                status = UserStatus.PasswordResetPending;
+                return true;
+            }
+
+            if (string.Equals(value.Trim(), "Invite Pending", StringComparison.OrdinalIgnoreCase))
+            {
+                status = UserStatus.InvitePending;
+                return true;
+            }
+
             return Enum.TryParse(value.Trim(), true, out status);
+        }
+
+        private static bool IsEmployeeManagedAccount(User user)
+        {
+            return !string.Equals(user.Role, "Borrower", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(user.Role, "REA", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(user.Role, "RealEstateAgent", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(user.Role, "Agent", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private string CreateUserActionToken(User user, string purpose)
+        {
+            var jwtKey = _configuration["Jwt:Key"];
+
+            if (string.IsNullOrWhiteSpace(jwtKey))
+                throw new InvalidOperationException("JWT Key missing.");
+
+            var claims = new[]
+            {
+                new Claim("UserId", user.Id.ToString()),
+                new Claim("Email", user.Email),
+                new Claim("Purpose", purpose)
+            };
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+
+            var token = new JwtSecurityToken(
+                claims: claims,
+                expires: DateTime.UtcNow.AddMinutes(PasswordResetTokenMinutes),
+                signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256)
+            );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        private static string ToStatusLabel(UserStatus status)
+        {
+            return status switch
+            {
+                UserStatus.PasswordResetPending => "Password Reset Pending",
+                UserStatus.InvitePending => "Invite Pending",
+                _ => status.ToString()
+            };
         }
 
         private static string NormalizeEmail(string email)
@@ -707,10 +1194,112 @@ namespace PrestexaAPI.Controllers
             if (string.IsNullOrWhiteSpace(role))
                 return false;
 
-            return string.Equals(role, "Owner", StringComparison.OrdinalIgnoreCase)
+            return string.Equals(role, "SuperAdmin", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(role, "Owner", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(role, "Company Admin", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(role, "Associate Admin", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(role, "Branch Admin", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private async Task<ProfilePhotoResolution> ResolveRequestedProfilePhotoAssetAsync(UpdateUserRequest request, string companyNmlsNumber)
+        {
+            var requestedByRemoveFlag = request.RemoveProfilePhoto == true;
+            var requestedByAssetId = request.ProfilePhotoAssetId.HasValue;
+            var requestedByUrl = !string.IsNullOrWhiteSpace(request.ProfilePhotoUrl);
+
+            if (!requestedByRemoveFlag && !requestedByAssetId && !requestedByUrl)
+            {
+                return ProfilePhotoResolution.NoChange();
+            }
+
+            if (requestedByRemoveFlag || request.ProfilePhotoAssetId == 0)
+            {
+                return ProfilePhotoResolution.ChangeTo(null);
+            }
+
+            MediaAsset? assetById = null;
+            MediaAsset? assetByUrl = null;
+
+            if (request.ProfilePhotoAssetId.HasValue)
+            {
+                assetById = await _context.MediaAssets
+                    .FirstOrDefaultAsync(x => x.Id == request.ProfilePhotoAssetId.Value);
+
+                if (assetById == null)
+                    return ProfilePhotoResolution.Invalid("Profile photo asset was not found.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.ProfilePhotoUrl))
+            {
+                if (!TryExtractPublicId(request.ProfilePhotoUrl, out var publicId))
+                    return ProfilePhotoResolution.Invalid("Profile photo URL is invalid.");
+
+                assetByUrl = await _context.MediaAssets
+                    .FirstOrDefaultAsync(x => x.PublicId == publicId);
+
+                if (assetByUrl == null)
+                    return ProfilePhotoResolution.Invalid("Profile photo URL does not reference a valid asset.");
+            }
+
+            if (assetById != null && assetByUrl != null && assetById.Id != assetByUrl.Id)
+            {
+                return ProfilePhotoResolution.Invalid("Profile photo reference mismatch between asset id and URL.");
+            }
+
+            var resolvedAsset = assetById ?? assetByUrl;
+            if (resolvedAsset == null)
+                return ProfilePhotoResolution.Invalid("Profile photo reference is missing.");
+
+            if (!resolvedAsset.IsActive)
+                return ProfilePhotoResolution.Invalid("Profile photo asset is inactive.");
+
+            if (resolvedAsset.Category != MediaAssetCategory.UserProfilePhoto)
+                return ProfilePhotoResolution.Invalid("Profile photo asset category is invalid.");
+
+            var normalizedPrefix = $"companies/{companyNmlsNumber.Trim()}/";
+            var normalizedStoragePath = (resolvedAsset.StoragePath ?? string.Empty).Replace('\\', '/');
+            if (!normalizedStoragePath.StartsWith(normalizedPrefix, StringComparison.OrdinalIgnoreCase))
+                return ProfilePhotoResolution.Invalid("Profile photo asset does not belong to this organization.");
+
+            return ProfilePhotoResolution.ChangeTo(resolvedAsset.Id);
+        }
+
+        private static bool TryExtractPublicId(string profilePhotoUrl, out Guid publicId)
+        {
+            publicId = Guid.Empty;
+
+            if (string.IsNullOrWhiteSpace(profilePhotoUrl))
+                return false;
+
+            if (Uri.TryCreate(profilePhotoUrl, UriKind.Absolute, out var absoluteUri))
+            {
+                var absoluteSegments = absoluteUri.AbsolutePath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+                if (absoluteSegments.Length == 0)
+                    return false;
+
+                return Guid.TryParse(absoluteSegments[^1], out publicId);
+            }
+
+            if (Uri.TryCreate(profilePhotoUrl, UriKind.Relative, out var relativeUri))
+            {
+                var relativePath = relativeUri.ToString().Split('?', StringSplitOptions.RemoveEmptyEntries)[0];
+                var relativeSegments = relativePath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+                if (relativeSegments.Length == 0)
+                    return false;
+
+                return Guid.TryParse(relativeSegments[^1], out publicId);
+            }
+
+            return false;
+        }
+
+        private sealed record ProfilePhotoResolution(bool HasRequestedChange, bool IsValid, int? NewAssetId, string? ErrorMessage)
+        {
+            public static ProfilePhotoResolution NoChange() => new(false, true, null, null);
+
+            public static ProfilePhotoResolution ChangeTo(int? assetId) => new(true, true, assetId, null);
+
+            public static ProfilePhotoResolution Invalid(string message) => new(true, false, null, message);
         }
 
         private static bool IsUserRoleHistoryAdminRole(string? role)
@@ -1030,7 +1619,10 @@ namespace PrestexaAPI.Controllers
                 user.Role,
                 Roles = roles,
                 user.SeatType,
-                user.Status,
+                Status = ToStatusLabel(user.Status),
+                StatusCode = (int)user.Status,
+                IsActive = user.Status == UserStatus.Active,
+                IsInactive = user.Status == UserStatus.Inactive,
                 user.StartDate,
                 user.LastLoginAt,
                 user.CreatedAt,
@@ -1367,6 +1959,28 @@ namespace PrestexaAPI.Controllers
                 TargetUserId = user.Id,
                 ChangedByUserId = changedByUserId,
                 ChangedAtUtc = changedAtUtc
+            });
+        }
+
+        private async Task AddUserLifecycleAuditEventAsync(
+            User user,
+            string action,
+            string fieldName,
+            object details)
+        {
+            var organizationId = await ResolveOrganizationIdAsync(user.CompanyNmlsNumber);
+            var payload = JsonSerializer.Serialize(details);
+
+            _context.OrganizationAuditRecords.Add(new OrganizationAuditRecord
+            {
+                OrganizationId = organizationId,
+                CompanyNmlsNumber = user.CompanyNmlsNumber,
+                Action = action,
+                FieldName = fieldName,
+                NewValue = payload.Length <= 1000 ? payload : payload[..1000],
+                TargetUserId = user.Id,
+                ChangedByUserId = _currentUserService.UserId,
+                ChangedAtUtc = DateTime.UtcNow
             });
         }
     }

@@ -414,7 +414,10 @@ namespace PrestexaAPI.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var principal = ValidatePasswordResetToken(request.Token);
+            var principal = ValidatePasswordResetToken(
+                request.Token,
+                "password_reset",
+                "invite_password_set");
 
             if (principal == null)
                 return Unauthorized("Invalid or expired reset token.");
@@ -437,10 +440,13 @@ namespace PrestexaAPI.Controllers
             if (user.Company == null || !user.Company.IsActive)
                 return Unauthorized("Company is inactive.");
 
-            if (user.Status != UserStatus.Active)
+            if (user.Status != UserStatus.Active &&
+                user.Status != UserStatus.PasswordResetPending &&
+                user.Status != UserStatus.InvitePending)
                 return Unauthorized("User is not active.");
 
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+            user.Status = UserStatus.Active;
             user.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -807,7 +813,7 @@ namespace PrestexaAPI.Controllers
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
-        private ClaimsPrincipal? ValidatePasswordResetToken(string token)
+        private ClaimsPrincipal? ValidatePasswordResetToken(string token, params string[] expectedPurposes)
         {
             try
             {
@@ -835,7 +841,16 @@ namespace PrestexaAPI.Controllers
 
                 var purpose = principal.FindFirst("Purpose")?.Value;
 
-                if (!string.Equals(purpose, "password_reset", StringComparison.Ordinal))
+                var normalizedExpected = expectedPurposes
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Select(x => x.Trim())
+                    .ToList();
+
+                if (normalizedExpected.Count == 0)
+                    normalizedExpected.Add("password_reset");
+
+                if (string.IsNullOrWhiteSpace(purpose) ||
+                    !normalizedExpected.Contains(purpose, StringComparer.Ordinal))
                     return null;
 
                 return principal;
