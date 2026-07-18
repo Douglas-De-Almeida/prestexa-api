@@ -31,6 +31,15 @@ namespace PrestexaAPI.Models
         [MaxLength(100)]
         public string LastName { get; set; } = null!;
 
+        [MaxLength(20)]
+        public string? Suffix { get; set; }
+
+        [MaxLength(100)]
+        public string? Nickname { get; set; }
+
+        [MaxLength(20)]
+        public string? SsnItin { get; set; }
+
         [MaxLength(255)]
         public string? Email { get; set; }
 
@@ -42,6 +51,9 @@ namespace PrestexaAPI.Models
 
         [MaxLength(30)]
         public string? WorkPhone { get; set; }
+
+        [MaxLength(10)]
+        public string? WorkPhoneExtension { get; set; }
 
         [MaxLength(20)]
         public string? MaritalStatus { get; set; }
@@ -56,6 +68,23 @@ namespace PrestexaAPI.Models
         public bool EConsentAuthorized { get; set; } = false;
 
         public bool CreditPullAuthorized { get; set; } = false;
+
+        public int? NumberOfDependents { get; set; }
+
+        [MaxLength(500)]
+        public string? DependentAges { get; set; }
+
+        public bool? MailingAddressSameAsCurrent { get; set; }
+
+        [MaxLength(200)]
+        public string? OtherLanguageDescription { get; set; }
+
+        [MaxLength(2000)]
+        public string? LanguagePreferences { get; set; }
+
+        public int? ApplicationNumber { get; set; }
+
+        public int? ApplicationBorrowerOrder { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
