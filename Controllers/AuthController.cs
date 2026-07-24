@@ -11,6 +11,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json.Serialization;
 
 namespace PrestexaAPI.Controllers
 {
@@ -23,11 +24,13 @@ namespace PrestexaAPI.Controllers
         private readonly IConfiguration _config;
         private readonly IAuthTokenService _authTokenService;
         private readonly IEmailSender _emailSender;
+        private readonly ITrustedDeviceService _trustedDeviceService;
         private readonly ILogger<AuthController> _logger;
 
         private const string IssuerName = "Prestexa";
         private const int TwoFactorTemporaryTokenMinutes = 10;
         private const int PasswordResetTokenMinutes = 30;
+        private const int EmployeeMfaRememberHours = 72;
         private const string EmployeePortal = "los";
 
         public AuthController(
@@ -35,12 +38,14 @@ namespace PrestexaAPI.Controllers
             IConfiguration config,
             IAuthTokenService authTokenService,
             IEmailSender emailSender,
+            ITrustedDeviceService trustedDeviceService,
             ILogger<AuthController> logger)
         {
             _context = context;
             _config = config;
             _authTokenService = authTokenService;
             _emailSender = emailSender;
+            _trustedDeviceService = trustedDeviceService;
             _logger = logger;
         }
 
@@ -287,6 +292,37 @@ namespace PrestexaAPI.Controllers
             if (user.Status != UserStatus.Active)
                 return BadRequest(new { message = "User is not active." });
 
+            if (user.TwoFactorEnabled)
+            {
+                var isTrustedDevice = await _trustedDeviceService.IsTrustedAsync(
+                    user.Id,
+                    EmployeePortal,
+                    request.DeviceId);
+
+                if (isTrustedDevice)
+                {
+                    var trustedToken = await _authTokenService.CreateFinalJwtTokenAsync(user, EmployeePortal);
+                    if (string.IsNullOrWhiteSpace(trustedToken))
+                    {
+                        _logger.LogError("Auth token creation returned empty payload for trusted-device login for user {UserId}.", user.Id);
+                        return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Authentication session could not be created." });
+                    }
+
+                    return Ok(new AuthLoginResponse
+                    {
+                        Status = "authenticated",
+                        Success = true,
+                        RequiresTwoFactor = false,
+                        RequiresAuthenticatorSetup = false,
+                        MfaRemembered = true,
+                        Token = trustedToken,
+                        User = BuildUserResponse(user),
+                        Email = user.Email,
+                        Message = "Login successful. MFA was remembered for this device."
+                    });
+                }
+            }
+
             user.LastLoginAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
@@ -301,25 +337,33 @@ namespace PrestexaAPI.Controllers
                 var setupToken = CreateTwoFactorTemporaryToken(user, "2fa_setup");
                 var otpauthUri = BuildOtpAuthUri(user.Email, user.TwoFactorSecret);
 
-                return Ok(new
+                return Ok(new AuthLoginResponse
                 {
-                    requiresAuthenticatorSetup = true,
-                    setupToken,
-                    email = user.Email,
-                    manualKey = user.TwoFactorSecret,
-                    otpauthUri,
-                    message = "Authenticator setup is required."
+                    Status = "requires_authenticator_setup",
+                    Success = false,
+                    RequiresTwoFactor = false,
+                    RequiresAuthenticatorSetup = true,
+                    MfaRemembered = false,
+                    SetupToken = setupToken,
+                    Email = user.Email,
+                    ManualKey = user.TwoFactorSecret,
+                    OtpAuthUri = otpauthUri,
+                    Message = "Authenticator setup is required."
                 });
             }
 
             var twoFactorToken = CreateTwoFactorTemporaryToken(user, "2fa_login");
 
-            return Ok(new
+            return Ok(new AuthLoginResponse
             {
-                requiresTwoFactor = true,
-                twoFactorToken,
-                email = user.Email,
-                message = "Two-factor authentication is required."
+                Status = "requires_two_factor",
+                Success = false,
+                RequiresTwoFactor = true,
+                RequiresAuthenticatorSetup = false,
+                MfaRemembered = false,
+                TwoFactorToken = twoFactorToken,
+                Email = user.Email,
+                Message = "Two-factor authentication is required."
             });
         }
 
@@ -498,6 +542,21 @@ namespace PrestexaAPI.Controllers
             user.TwoFactorEnabledAt = DateTime.UtcNow;
             user.TwoFactorLastVerifiedAt = DateTime.UtcNow;
 
+            if (request.ShouldTrustDevice())
+            {
+                await _trustedDeviceService.RememberAsync(
+                    user.Id,
+                    EmployeePortal,
+                    request.DeviceId,
+                    TimeSpan.FromHours(EmployeeMfaRememberHours));
+
+                await UpdateTrustedDeviceMetadataAsync(
+                    user.Id,
+                    request.DeviceId,
+                    request.DeviceName,
+                    request.DeviceType);
+            }
+
             await _context.SaveChangesAsync();
 
             var finalToken = await _authTokenService.CreateFinalJwtTokenAsync(
@@ -505,11 +564,23 @@ namespace PrestexaAPI.Controllers
                 EmployeePortal
             );
 
-            return Ok(new
+            if (string.IsNullOrWhiteSpace(finalToken))
             {
-                token = finalToken,
-                user = BuildUserResponse(user),
-                message = "Authenticator enabled successfully."
+                _logger.LogError("Auth token creation returned empty payload for authenticator enable for user {UserId}.", user.Id);
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Authentication session could not be created." });
+            }
+
+            return Ok(new AuthLoginResponse
+            {
+                Status = "authenticated",
+                Success = true,
+                RequiresTwoFactor = false,
+                RequiresAuthenticatorSetup = false,
+                MfaRemembered = request.ShouldTrustDevice(),
+                Token = finalToken,
+                User = BuildUserResponse(user),
+                Email = user.Email,
+                Message = "Authenticator enabled successfully."
             });
         }
 
@@ -562,6 +633,21 @@ namespace PrestexaAPI.Controllers
 
             user.TwoFactorLastVerifiedAt = DateTime.UtcNow;
 
+            if (request.ShouldTrustDevice())
+            {
+                await _trustedDeviceService.RememberAsync(
+                    user.Id,
+                    EmployeePortal,
+                    request.DeviceId,
+                    TimeSpan.FromHours(EmployeeMfaRememberHours));
+
+                await UpdateTrustedDeviceMetadataAsync(
+                    user.Id,
+                    request.DeviceId,
+                    request.DeviceName,
+                    request.DeviceType);
+            }
+
             await _context.SaveChangesAsync();
 
             var finalToken = await _authTokenService.CreateFinalJwtTokenAsync(
@@ -569,11 +655,23 @@ namespace PrestexaAPI.Controllers
                 EmployeePortal
             );
 
-            return Ok(new
+            if (string.IsNullOrWhiteSpace(finalToken))
             {
-                token = finalToken,
-                user = BuildUserResponse(user),
-                message = "Two-factor authentication successful."
+                _logger.LogError("Auth token creation returned empty payload for 2FA verify-login for user {UserId}.", user.Id);
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Authentication session could not be created." });
+            }
+
+            return Ok(new AuthLoginResponse
+            {
+                Status = "authenticated",
+                Success = true,
+                RequiresTwoFactor = false,
+                RequiresAuthenticatorSetup = false,
+                MfaRemembered = request.ShouldTrustDevice(),
+                Token = finalToken,
+                User = BuildUserResponse(user),
+                Email = user.Email,
+                Message = "Two-factor authentication successful."
             });
         }
 
@@ -908,6 +1006,67 @@ namespace PrestexaAPI.Controllers
                 && !string.Equals(user.Role, "Agent", StringComparison.OrdinalIgnoreCase);
         }
 
+        private async Task UpdateTrustedDeviceMetadataAsync(
+            int userId,
+            string? deviceId,
+            string? deviceName,
+            string? deviceType)
+        {
+            var normalizedDeviceId = NormalizeDeviceId(deviceId);
+            if (normalizedDeviceId == null)
+                return;
+
+            var trustedDevice = await _context.TrustedMfaDevices
+                .FirstOrDefaultAsync(x =>
+                    x.UserId == userId &&
+                    x.Portal == EmployeePortal &&
+                    x.DeviceId == normalizedDeviceId);
+
+            if (trustedDevice == null)
+                return;
+
+            if (!string.IsNullOrWhiteSpace(deviceName))
+                trustedDevice.DeviceName = NormalizeDeviceName(deviceName);
+
+            if (!string.IsNullOrWhiteSpace(deviceType))
+                trustedDevice.DeviceType = NormalizeDeviceType(deviceType);
+
+            trustedDevice.UpdatedAt = DateTime.UtcNow;
+        }
+
+        private static string? NormalizeDeviceId(string? deviceId)
+        {
+            if (string.IsNullOrWhiteSpace(deviceId))
+                return null;
+
+            var normalized = deviceId.Trim();
+
+            if (normalized.Length > 100)
+                return null;
+
+            return normalized;
+        }
+
+        private static string NormalizeDeviceName(string deviceName)
+        {
+            var normalized = deviceName.Trim();
+
+            if (normalized.Length == 0)
+                return "Trusted Device";
+
+            return normalized.Length <= 100 ? normalized : normalized[..100];
+        }
+
+        private static string NormalizeDeviceType(string deviceType)
+        {
+            var normalized = deviceType.Trim();
+
+            if (normalized.Length == 0)
+                return string.Empty;
+
+            return normalized.Length <= 50 ? normalized : normalized[..50];
+        }
+
         private static object BuildUserResponse(User user)
         {
             return new
@@ -934,6 +1093,17 @@ namespace PrestexaAPI.Controllers
         public string? DeviceName { get; set; }
 
         public string? DeviceType { get; set; }
+
+        [JsonPropertyName("trustDevice")]
+        public bool? TrustDevice { get; set; }
+
+        [JsonPropertyName("rememberDevice")]
+        public bool? RememberDevice { get; set; }
+
+        public bool ShouldTrustDevice()
+        {
+            return TrustDevice == true || RememberDevice == true;
+        }
     }
 
     public class VerifyTwoFactorLoginRequest
@@ -947,5 +1117,58 @@ namespace PrestexaAPI.Controllers
         public string? DeviceName { get; set; }
 
         public string? DeviceType { get; set; }
+
+        [JsonPropertyName("trustDevice")]
+        public bool? TrustDevice { get; set; }
+
+        [JsonPropertyName("rememberDevice")]
+        public bool? RememberDevice { get; set; }
+
+        public bool ShouldTrustDevice()
+        {
+            return TrustDevice == true || RememberDevice == true;
+        }
+    }
+
+    public class AuthLoginResponse
+    {
+        [JsonPropertyName("status")]
+        public string Status { get; set; } = "unknown";
+
+        [JsonPropertyName("success")]
+        public bool Success { get; set; }
+
+        [JsonPropertyName("requiresTwoFactor")]
+        public bool RequiresTwoFactor { get; set; }
+
+        [JsonPropertyName("requiresAuthenticatorSetup")]
+        public bool RequiresAuthenticatorSetup { get; set; }
+
+        [JsonPropertyName("mfaRemembered")]
+        public bool MfaRemembered { get; set; }
+
+        [JsonPropertyName("token")]
+        public string? Token { get; set; }
+
+        [JsonPropertyName("twoFactorToken")]
+        public string? TwoFactorToken { get; set; }
+
+        [JsonPropertyName("setupToken")]
+        public string? SetupToken { get; set; }
+
+        [JsonPropertyName("email")]
+        public string? Email { get; set; }
+
+        [JsonPropertyName("manualKey")]
+        public string? ManualKey { get; set; }
+
+        [JsonPropertyName("otpauthUri")]
+        public string? OtpAuthUri { get; set; }
+
+        [JsonPropertyName("user")]
+        public object? User { get; set; }
+
+        [JsonPropertyName("message")]
+        public string Message { get; set; } = string.Empty;
     }
 }
