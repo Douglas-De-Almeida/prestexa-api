@@ -20,27 +20,23 @@ namespace PrestexaAPI.Controllers
         private readonly IConfiguration _config;
         private readonly IEmailSender _emailSender;
         private readonly IAuthTokenService _authTokenService;
-        private readonly ITrustedDeviceService _trustedDeviceService;
         private readonly ILogger<BorrowerAuthController> _logger;
 
         private const int OtpTokenMinutes = 10;
         private const int PasswordResetTokenMinutes = 30;
         private const string BorrowerPortal = "borrower";
-        private static readonly TimeSpan BorrowerRememberDuration = TimeSpan.FromDays(7);
 
         public BorrowerAuthController(
             AppDbContext context,
             IConfiguration config,
             IEmailSender emailSender,
             IAuthTokenService authTokenService,
-            ITrustedDeviceService trustedDeviceService,
             ILogger<BorrowerAuthController> logger)
         {
             _context = context;
             _config = config;
             _emailSender = emailSender;
             _authTokenService = authTokenService;
-            _trustedDeviceService = trustedDeviceService;
             _logger = logger;
         }
 
@@ -62,7 +58,7 @@ namespace PrestexaAPI.Controllers
                 return BadRequest("Invalid or inactive company.");
 
             var existingUser = await _context.Users
-                .FirstOrDefaultAsync(u => u.Email == normalizedEmail);
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
 
             if (existingUser != null)
                 return BadRequest("User already exists.");
@@ -111,7 +107,7 @@ namespace PrestexaAPI.Controllers
 
             var user = await _context.Users
                 .Include(u => u.Company)
-                .FirstOrDefaultAsync(u => u.Email == normalizedEmail);
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
 
             if (user == null)
                 return Unauthorized("Invalid credentials.");
@@ -130,28 +126,6 @@ namespace PrestexaAPI.Controllers
 
             user.LastLoginAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
-
-            var isTrustedDevice = await _trustedDeviceService.IsTrustedAsync(
-                user.Id,
-                BorrowerPortal,
-                request.DeviceId
-            );
-
-            if (isTrustedDevice)
-            {
-                var finalToken = await _authTokenService.CreateFinalJwtTokenAsync(
-                    user,
-                    BorrowerPortal
-                );
-
-                return Ok(new
-                {
-                    token = finalToken,
-                    user = BuildUserResponse(user),
-                    mfaRemembered = true,
-                    message = "Borrower login successful. Verification was remembered for this device."
-                });
-            }
 
             var code = GenerateSixDigitCode();
             var otpToken = CreateOtpTemporaryToken(user, "borrower_otp", code);
@@ -230,13 +204,6 @@ namespace PrestexaAPI.Controllers
 
             user.LastLoginAt = DateTime.UtcNow;
 
-            await _trustedDeviceService.RememberAsync(
-                user.Id,
-                BorrowerPortal,
-                request.DeviceId,
-                BorrowerRememberDuration
-            );
-
             await _context.SaveChangesAsync();
 
             var finalToken = await _authTokenService.CreateFinalJwtTokenAsync(
@@ -265,7 +232,7 @@ namespace PrestexaAPI.Controllers
 
             var user = await _context.Users
                 .Include(u => u.Company)
-                .FirstOrDefaultAsync(u => u.Email == normalizedEmail);
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
 
             if (user == null ||
                 !IsBorrower(user) ||

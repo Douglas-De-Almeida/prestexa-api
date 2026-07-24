@@ -215,16 +215,15 @@ namespace PrestexaAPI.Controllers
         public async Task<IActionResult> GetUsers()
         {
             var companyNmlsNumber = GetCompanyNmlsNumber();
-            var role = GetCurrentRole();
 
-            if (string.IsNullOrWhiteSpace(companyNmlsNumber) && !IsSuperAdmin(role))
+            if (string.IsNullOrWhiteSpace(companyNmlsNumber) && !_currentUserService.IsSuperAdmin)
                 return Unauthorized("CompanyNmlsNumber claim is required.");
 
             var query = _context.Users
                 .Include(u => u.ProfilePhotoAsset)
                 .AsQueryable();
 
-            if (!IsSuperAdmin(role))
+            if (!_currentUserService.IsSuperAdmin)
                 query = query.Where(u => u.CompanyNmlsNumber == companyNmlsNumber);
 
             var users = await query.ToListAsync();
@@ -295,6 +294,93 @@ namespace PrestexaAPI.Controllers
             });
         }
 
+        [HttpGet("{userId}/trusted-devices")]
+        public Task<IActionResult> GetUserTrustedDevices(int userId)
+        {
+            return Task.FromResult<IActionResult>(StatusCode(StatusCodes.Status410Gone, new
+            {
+                message = "Trusted device management has been removed and is no longer available."
+            }));
+        }
+
+        [HttpGet("{userId}/trusted-devices/audit")]
+        public Task<IActionResult> GetUserTrustedDeviceAudit(int userId)
+        {
+            return Task.FromResult<IActionResult>(StatusCode(StatusCodes.Status410Gone, new
+            {
+                message = "Trusted device management has been removed and is no longer available."
+            }));
+        }
+
+        [HttpPost("{userId}/trusted-devices/audit")]
+        public Task<IActionResult> GetUserTrustedDeviceAuditCompat(int userId)
+        {
+            return GetUserTrustedDeviceAudit(userId);
+        }
+
+        [HttpPut("{userId}/trusted-devices/policy")]
+        public Task<IActionResult> UpdateUserTrustedDevicePolicy(int userId)
+        {
+            return Task.FromResult<IActionResult>(StatusCode(StatusCodes.Status410Gone, new
+            {
+                message = "Trusted device management has been removed and is no longer available."
+            }));
+        }
+
+        [HttpPost("{userId}/trusted-devices/{deviceRecordId}/approve")]
+        public Task<IActionResult> ApproveUserTrustedDevice(int userId, int deviceRecordId)
+        {
+            return Task.FromResult<IActionResult>(StatusCode(StatusCodes.Status410Gone, new
+            {
+                message = "Trusted device management has been removed and is no longer available."
+            }));
+        }
+
+        [HttpPost("{userId}/trusted-devices/{deviceRecordId}/approve-pending")]
+        public Task<IActionResult> ApprovePendingUserTrustedDevice(int userId, int deviceRecordId)
+        {
+            return Task.FromResult<IActionResult>(StatusCode(StatusCodes.Status410Gone, new
+            {
+                message = "Trusted device management has been removed and is no longer available."
+            }));
+        }
+
+        [HttpPost("{userId}/trusted-devices/{deviceRecordId}/disable")]
+        public Task<IActionResult> DisableUserTrustedDevice(int userId, int deviceRecordId)
+        {
+            return Task.FromResult<IActionResult>(StatusCode(StatusCodes.Status410Gone, new
+            {
+                message = "Trusted device management has been removed and is no longer available."
+            }));
+        }
+
+        [HttpPost("{userId}/trusted-devices/{deviceRecordId}/reject")]
+        public Task<IActionResult> RejectUserTrustedDevice(int userId, int deviceRecordId)
+        {
+            return Task.FromResult<IActionResult>(StatusCode(StatusCodes.Status410Gone, new
+            {
+                message = "Trusted device management has been removed and is no longer available."
+            }));
+        }
+
+        [HttpPut("{userId}/trusted-devices/{deviceRecordId}/rename")]
+        public Task<IActionResult> RenameUserTrustedDevice(int userId, int deviceRecordId, [FromBody] RenameTrustedDeviceRequest request)
+        {
+            return Task.FromResult<IActionResult>(StatusCode(StatusCodes.Status410Gone, new
+            {
+                message = "Trusted device management has been removed and is no longer available."
+            }));
+        }
+
+        [HttpDelete("{userId}/trusted-devices/{deviceRecordId}")]
+        public Task<IActionResult> RemoveUserTrustedDevice(int userId, int deviceRecordId)
+        {
+            return Task.FromResult<IActionResult>(StatusCode(StatusCodes.Status410Gone, new
+            {
+                message = "Trusted device management has been removed and is no longer available."
+            }));
+        }
+
         [HttpPost]
         public async Task<IActionResult> CreateUser([FromBody] CreateUserRequest request)
         {
@@ -348,9 +434,11 @@ namespace PrestexaAPI.Controllers
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
                 PhoneNumber = request.PhoneNumber.Trim(),
                 Role = primaryRole,
-                UserNmlsNumber = string.IsNullOrWhiteSpace(request.UserNmlsNumber)
-                    ? null
-                    : request.UserNmlsNumber.Trim(),
+                UserNmlsNumber = ResolveUserNmlsNumber(
+                    request.UserNmlsNumber,
+                    request.Nmls,
+                    request.NmlsId,
+                    request.NmlsNumber),
                 OfficePhone = string.IsNullOrWhiteSpace(request.OfficePhone)
                     ? null
                     : request.OfficePhone.Trim(),
@@ -400,14 +488,46 @@ namespace PrestexaAPI.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            if (!TryResolveRequestedRoles(request.PrimaryRole, request.Role, request.Roles, out var primaryRole, out var roleNames, out var roleError))
-                return BadRequest(new { error = roleError });
+            if (!CanManageEmployeeUsers())
+                return Forbid();
 
             var user = await BuildAccessibleUsersQuery()
                 .FirstOrDefaultAsync(u => u.Id == userId);
 
             if (user == null)
                 return NotFound("User not found.");
+
+            var allowStatusOnlyRoleBypass = IsStatusOnlyUpdateRequest(request, user);
+            var allowProfileOnlyRoleBypass = false;
+
+            var hasResolvedRoles = TryResolveRequestedRoles(
+                request.PrimaryRole,
+                request.Role,
+                request.Roles,
+                out var primaryRole,
+                out var roleNames,
+                out var roleError);
+
+            if (!hasResolvedRoles
+                && string.IsNullOrWhiteSpace(request.Status)
+                && IsNonRoleProfileUpdateRequest(request, user))
+            {
+                allowProfileOnlyRoleBypass = true;
+                primaryRole = user.Role;
+                roleNames = await GetActiveUserRoleNamesOrFallbackAsync(user);
+                hasResolvedRoles = true;
+            }
+
+            if (!hasResolvedRoles)
+            {
+                if (!allowStatusOnlyRoleBypass)
+                    return BadRequest(new { error = roleError });
+
+                primaryRole = user.Role;
+                roleNames = await GetActiveUserRoleNamesOrFallbackAsync(user);
+            }
+
+            var statusOnlyRoleBypassActive = allowStatusOnlyRoleBypass && !hasResolvedRoles;
 
             var normalizedEmail = NormalizeEmail(request.Email);
 
@@ -426,33 +546,41 @@ namespace PrestexaAPI.Controllers
             var oldFirstName = user.FirstName;
             var oldLastName = user.LastName;
             var oldProfilePhotoAssetId = user.ProfilePhotoAssetId;
+            var shouldSyncRoles = hasResolvedRoles && !allowProfileOnlyRoleBypass;
 
-            user.FirstName = request.FirstName.Trim();
-            user.MiddleName = string.IsNullOrWhiteSpace(request.MiddleName)
-                ? null
-                : request.MiddleName.Trim();
-            user.LastName = request.LastName.Trim();
-            user.Email = normalizedEmail;
-            if (!string.IsNullOrWhiteSpace(request.PhoneNumber))
+            if (!statusOnlyRoleBypassActive)
             {
-                user.PhoneNumber = request.PhoneNumber.Trim();
+                user.FirstName = request.FirstName.Trim();
+                user.MiddleName = string.IsNullOrWhiteSpace(request.MiddleName)
+                    ? null
+                    : request.MiddleName.Trim();
+                user.LastName = request.LastName.Trim();
+                user.Email = normalizedEmail;
+                if (!string.IsNullOrWhiteSpace(request.PhoneNumber))
+                {
+                    user.PhoneNumber = request.PhoneNumber.Trim();
+                }
+                user.UserNmlsNumber = ResolveUserNmlsNumber(
+                    request.UserNmlsNumber,
+                    request.Nmls,
+                    request.NmlsId,
+                    request.NmlsNumber);
+                user.OfficePhone = string.IsNullOrWhiteSpace(request.OfficePhone)
+                    ? null
+                    : request.OfficePhone.Trim();
+                user.OfficePhoneExtension = string.IsNullOrWhiteSpace(request.OfficePhoneExtension)
+                    ? null
+                    : request.OfficePhoneExtension.Trim();
+                user.MobilePhone = string.IsNullOrWhiteSpace(request.MobilePhone)
+                    ? null
+                    : request.MobilePhone.Trim();
+                user.ClientFacingTitle = string.IsNullOrWhiteSpace(request.ClientFacingTitle)
+                    ? null
+                    : request.ClientFacingTitle.Trim();
             }
-            user.Role = primaryRole;
-            user.UserNmlsNumber = string.IsNullOrWhiteSpace(request.UserNmlsNumber)
-                ? null
-                : request.UserNmlsNumber.Trim();
-            user.OfficePhone = string.IsNullOrWhiteSpace(request.OfficePhone)
-                ? null
-                : request.OfficePhone.Trim();
-            user.OfficePhoneExtension = string.IsNullOrWhiteSpace(request.OfficePhoneExtension)
-                ? null
-                : request.OfficePhoneExtension.Trim();
-            user.MobilePhone = string.IsNullOrWhiteSpace(request.MobilePhone)
-                ? null
-                : request.MobilePhone.Trim();
-            user.ClientFacingTitle = string.IsNullOrWhiteSpace(request.ClientFacingTitle)
-                ? null
-                : request.ClientFacingTitle.Trim();
+
+            if (shouldSyncRoles)
+                user.Role = primaryRole;
             if (!string.IsNullOrWhiteSpace(request.Status))
             {
                 if (!TryParseUserStatus(request.Status, out var parsedStatus))
@@ -460,6 +588,7 @@ namespace PrestexaAPI.Controllers
 
                 user.Status = parsedStatus;
             }
+
             user.UpdatedAt = DateTime.UtcNow;
 
             var profilePhotoResolution = await ResolveRequestedProfilePhotoAssetAsync(request, user.CompanyNmlsNumber);
@@ -495,7 +624,7 @@ namespace PrestexaAPI.Controllers
                 user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
             }
 
-            if (roleChanged)
+            if (shouldSyncRoles && roleChanged)
             {
                 var roleEntity = await _context.Roles
                     .FirstOrDefaultAsync(r =>
@@ -515,7 +644,8 @@ namespace PrestexaAPI.Controllers
                 }
             }
 
-            await SyncUserRolesAsync(user, primaryRole, roleNames, request.RoleChangeReason);
+            if (shouldSyncRoles)
+                await SyncUserRolesAsync(user, primaryRole, roleNames, request.RoleChangeReason);
 
             await AddUserLifecycleAuditEventAsync(
                 user,
@@ -531,7 +661,9 @@ namespace PrestexaAPI.Controllers
                     oldStatus = previousStatus.ToString(),
                     newStatus = user.Status.ToString(),
                     oldPrimaryRole = currentRole,
-                    newPrimaryRole = primaryRole
+                    newPrimaryRole = user.Role,
+                    roleSyncApplied = shouldSyncRoles,
+                    roleSyncBypassedForStatusOnlyUpdate = !shouldSyncRoles
                 });
 
             if (previousStatus != user.Status)
@@ -554,9 +686,83 @@ namespace PrestexaAPI.Controllers
             return await GetUser(user.Id);
         }
 
+        [HttpPatch("{userId}/status")]
+        [HttpPut("{userId}/status")]
+        public async Task<IActionResult> UpdateUserStatus(int userId, [FromBody] UpdateUserStatusRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            if (!CanManageEmployeeUsers())
+                return Forbid();
+
+            var user = await BuildAccessibleUsersQuery()
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null)
+                return NotFound("User not found.");
+
+            if (!TryParseUserStatus(request.Status, out var parsedStatus))
+                return BadRequest("Invalid user status.");
+
+            var previousStatus = user.Status;
+
+            if (previousStatus == parsedStatus)
+            {
+                return Ok(new
+                {
+                    message = "User status is unchanged.",
+                    userId = user.Id,
+                    status = ToStatusLabel(user.Status),
+                    statusCode = (int)user.Status
+                });
+            }
+
+            user.Status = parsedStatus;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await AddUserLifecycleAuditEventAsync(
+                user,
+                "UserUpdated",
+                "User",
+                new
+                {
+                    targetUserId = user.Id,
+                    oldStatus = previousStatus.ToString(),
+                    newStatus = user.Status.ToString(),
+                    source = "status-endpoint"
+                });
+
+            var statusEvent = user.Status == UserStatus.Active ? "UserActivated" : "UserDeactivated";
+            await AddUserLifecycleAuditEventAsync(
+                user,
+                statusEvent,
+                "Status",
+                new
+                {
+                    targetUserId = user.Id,
+                    oldStatus = previousStatus.ToString(),
+                    newStatus = user.Status.ToString(),
+                    source = "status-endpoint"
+                });
+
+            await _context.SaveChangesAsync();
+
+            return await GetUser(user.Id);
+        }
+
+        [HttpPost("{userId}/deactivate")]
+        public Task<IActionResult> DeactivateUser(int userId)
+        {
+            return UpdateUserStatus(userId, new UpdateUserStatusRequest { Status = "Inactive" });
+        }
+
         [HttpDelete("{userId}")]
         public async Task<IActionResult> DeleteUser(int userId)
         {
+            if (!CanManageEmployeeUsers())
+                return Forbid();
+
             if (_currentUserService.UserId.HasValue && _currentUserService.UserId.Value == userId)
                 return BadRequest("You cannot delete your own account.");
 
@@ -762,6 +968,9 @@ namespace PrestexaAPI.Controllers
 
         private async Task<IActionResult> TransferAndDeleteUserInternal(int userId, TransferUserFilesRequest request)
         {
+            if (!CanManageEmployeeUsers())
+                return Forbid();
+
             if (request.TargetUserId <= 0)
                 return BadRequest("targetUserId is required.");
 
@@ -1027,10 +1236,9 @@ namespace PrestexaAPI.Controllers
 
         private IQueryable<User> BuildAccessibleUsersQuery()
         {
-            var role = GetCurrentRole();
             var query = _context.Users.AsQueryable();
 
-            if (!IsSuperAdmin(role))
+            if (!_currentUserService.IsSuperAdmin)
             {
                 var companyNmlsNumber = GetCompanyNmlsNumber();
 
@@ -1045,9 +1253,7 @@ namespace PrestexaAPI.Controllers
 
         private string? ResolveWriteCompanyNmlsNumber(string? requestedCompanyNmlsNumber)
         {
-            var role = GetCurrentRole();
-
-            if (IsSuperAdmin(role))
+            if (_currentUserService.IsSuperAdmin)
                 return string.IsNullOrWhiteSpace(requestedCompanyNmlsNumber)
                     ? GetCompanyNmlsNumber()
                     : requestedCompanyNmlsNumber.Trim();
@@ -1312,6 +1518,72 @@ namespace PrestexaAPI.Controllers
                 || string.Equals(role, "Company Admin", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(role, "Associate Admin", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(role, "Branch Admin", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private bool CanManageEmployeeUsers()
+        {
+            if (_currentUserService.IsSuperAdmin)
+                return true;
+
+            return _currentUserService.HasRole("Owner")
+                || _currentUserService.HasRole("Company Admin")
+                || _currentUserService.HasRole("Associate Admin")
+                || _currentUserService.HasRole("Branch Admin");
+        }
+
+        private static bool IsStatusOnlyUpdateRequest(UpdateUserRequest request, User user)
+        {
+            if (string.IsNullOrWhiteSpace(request.Status))
+                return false;
+
+            if (!string.IsNullOrWhiteSpace(request.Password))
+                return false;
+
+            if (request.ProfilePhotoAssetId.HasValue || request.RemoveProfilePhoto == true || !string.IsNullOrWhiteSpace(request.ProfilePhotoUrl))
+                return false;
+
+            static string? Normalize(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+            static bool IsSameOrBlank(string? requestValue, string? currentValue)
+            {
+                var normalizedRequest = Normalize(requestValue);
+                var normalizedCurrent = Normalize(currentValue);
+
+                return normalizedRequest is null
+                    || string.Equals(normalizedRequest, normalizedCurrent, StringComparison.Ordinal);
+            }
+
+            var normalizedEmail = NormalizeEmail(request.Email);
+
+            return string.Equals(request.FirstName.Trim(), user.FirstName, StringComparison.Ordinal)
+                && string.Equals(Normalize(request.MiddleName), Normalize(user.MiddleName), StringComparison.Ordinal)
+                && string.Equals(request.LastName.Trim(), user.LastName, StringComparison.Ordinal)
+                && string.Equals(normalizedEmail, NormalizeEmail(user.Email), StringComparison.Ordinal)
+                && IsSameOrBlank(request.PhoneNumber, user.PhoneNumber)
+                && IsSameOrBlank(request.UserNmlsNumber, user.UserNmlsNumber)
+                && IsSameOrBlank(request.OfficePhone, user.OfficePhone)
+                && IsSameOrBlank(request.OfficePhoneExtension, user.OfficePhoneExtension)
+                && IsSameOrBlank(request.MobilePhone, user.MobilePhone)
+                && IsSameOrBlank(request.ClientFacingTitle, user.ClientFacingTitle);
+        }
+
+        private async Task<List<string>> GetActiveUserRoleNamesOrFallbackAsync(User user)
+        {
+            var activeRoleNames = await _context.UserRoles
+                .AsNoTracking()
+                .Where(x => x.UserId == user.Id && x.IsActive)
+                .Select(x => x.RoleName)
+                .Distinct()
+                .ToListAsync();
+
+            if (activeRoleNames.Count == 0)
+                return [user.Role];
+
+            var normalizedPrimary = user.Role;
+
+            return activeRoleNames
+                .OrderByDescending(x => string.Equals(x, normalizedPrimary, StringComparison.OrdinalIgnoreCase))
+                .ThenBy(x => x)
+                .ToList();
         }
 
         private async Task<IActionResult> SaveProfilePhotoAsync(
@@ -1628,6 +1900,7 @@ namespace PrestexaAPI.Controllers
                 user.CreatedAt,
                 user.UpdatedAt,
                 user.TwoFactorEnabled,
+                user.RestrictLoginToApprovedDevices,
                 ProfilePhotoAssetId = user.ProfilePhotoAssetId,
                 ProfilePhotoUrl = BuildProfilePhotoUrl(user.ProfilePhotoAsset)
             };
@@ -1733,6 +2006,35 @@ namespace PrestexaAPI.Controllers
                 .ToList();
 
             return true;
+        }
+
+        private static string? ResolveUserNmlsNumber(
+            string? userNmlsNumber,
+            string? nmls,
+            string? nmlsId,
+            string? nmlsNumber)
+        {
+            var resolvedValue = new[] { userNmlsNumber, nmls, nmlsId, nmlsNumber }
+                .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+
+            return string.IsNullOrWhiteSpace(resolvedValue)
+                ? null
+                : resolvedValue.Trim();
+        }
+
+        private static bool IsNonRoleProfileUpdateRequest(UpdateUserRequest request, User user)
+        {
+            static string? Normalize(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+            return string.Equals(request.FirstName.Trim(), user.FirstName, StringComparison.Ordinal)
+                && string.Equals(Normalize(request.MiddleName), Normalize(user.MiddleName), StringComparison.Ordinal)
+                && string.Equals(request.LastName.Trim(), user.LastName, StringComparison.Ordinal)
+                && string.Equals(NormalizeEmail(request.Email), NormalizeEmail(user.Email), StringComparison.Ordinal)
+                && string.Equals(Normalize(request.PhoneNumber), Normalize(user.PhoneNumber), StringComparison.Ordinal)
+                && string.Equals(Normalize(request.OfficePhone), Normalize(user.OfficePhone), StringComparison.Ordinal)
+                && string.Equals(Normalize(request.OfficePhoneExtension), Normalize(user.OfficePhoneExtension), StringComparison.Ordinal)
+                && string.Equals(Normalize(request.MobilePhone), Normalize(user.MobilePhone), StringComparison.Ordinal)
+                && string.Equals(Normalize(request.ClientFacingTitle), Normalize(user.ClientFacingTitle), StringComparison.Ordinal);
         }
 
         private async Task SyncUserRolesAsync(
